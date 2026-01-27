@@ -31,6 +31,8 @@ public class GameManager : MonoBehaviour
         Time.timeScale = 1f;
         SceneLoader.Instance.Load(SceneNames.GameScene);
         Debug.Log("Game started");
+        if (InputManager.Instance != null)
+            InputManager.Instance.EnablePlayerInput();
     }
 
     public void GoToMenu()
@@ -39,6 +41,8 @@ public class GameManager : MonoBehaviour
         Time.timeScale = 1f;
         SceneLoader.Instance.Load(SceneNames.MainMenu);
         Debug.Log("Go to Main Menu");
+        if (InputManager.Instance != null)
+            InputManager.Instance.EnableUIInput();
     }
 
     public void Pause()

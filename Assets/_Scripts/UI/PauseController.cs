@@ -15,6 +15,11 @@ public class PauseController : MonoBehaviour
             EventBus.Instance.OnGamePaused += ShowPausePanel;
             EventBus.Instance.OnGameResumed += HidePausePanel;
         }
+        if (InputManager.Instance != null)
+        {
+            InputManager.Instance.OnPausePressed += HandlePausePressed;
+            InputManager.Instance.OnCancelPressed += HandleCancelPressed;
+        }
     }
 
     private void OnDisable()
@@ -25,6 +30,11 @@ public class PauseController : MonoBehaviour
             EventBus.Instance.OnGamePaused -= ShowPausePanel;
             EventBus.Instance.OnGameResumed -= HidePausePanel;
         }
+        if (InputManager.Instance != null)
+        {
+            InputManager.Instance.OnPausePressed -= HandlePausePressed;
+            InputManager.Instance.OnCancelPressed -= HandleCancelPressed;
+        }
     }
 
     private void Start()
@@ -34,36 +44,6 @@ public class PauseController : MonoBehaviour
             buttonResume.onClick.AddListener(OnResumeClicked);
         if (buttonMainMenu != null)
             buttonMainMenu.onClick.AddListener(OnMainMenuClicked);
-    }
-
-    private void Update()
-    {
-        // Проверяем нажатие Esc
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            TogglePause();
-        }
-    }
-
-    private void TogglePause()
-    {
-        // Проверяем, что менеджеры созданы
-        if (GameManager.Instance == null)
-        {
-            Debug.LogWarning("GameManager не создан! Запустите игру через Bootstrap.");
-            return;
-        }
-
-        // Просто вызываем методы GameManager
-        // EventBus автоматически покажет/скроет панель
-        if (GameManager.Instance.CurrentState == GameState.Playing)
-        {
-            GameManager.Instance.Pause(); // вызовет EventBus.Instance.RaiseGamePaused()
-        }
-        else if (GameManager.Instance.CurrentState == GameState.Paused)
-        {
-            GameManager.Instance.Resume(); // вызовет EventBus.Instance.RaiseGameResumed()
-        }
     }
 
     // Эти методы вызываются автоматически через EventBus
@@ -90,5 +70,16 @@ public class PauseController : MonoBehaviour
     {
         if (GameManager.Instance != null)
             GameManager.Instance.GoToMenu();
+    }
+    private void HandlePausePressed()
+    {
+        if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Playing)
+            GameManager.Instance.Pause();
+    }
+
+    private void HandleCancelPressed()
+    {
+        if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Paused)
+            GameManager.Instance.Resume();
     }
 }

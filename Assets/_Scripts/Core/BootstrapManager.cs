@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class BootstrapManager : MonoBehaviour
 {
@@ -20,6 +21,7 @@ public class BootstrapManager : MonoBehaviour
         CreateGameManager();
         CreateSceneLoader();
         CreateEventBus();
+        CreateInputManager();
 
         // Переходим в главное меню
         SceneLoader.Instance.Load(SceneNames.MainMenu);
@@ -64,6 +66,29 @@ public class BootstrapManager : MonoBehaviour
 
         GameObject go = new GameObject("EventBus");
         go.AddComponent<EventBus>();
+        DontDestroyOnLoad(go);
+    }
+    private static void CreateInputManager()
+    {
+        InputManager existing = FindFirstObjectByType<InputManager>();
+        if (existing != null)
+        {
+            DontDestroyOnLoad(existing.gameObject);
+            return;
+        }
+
+        GameObject go = new GameObject("InputManager");
+        InputManager inputManager = go.AddComponent<InputManager>();
+
+        // Загружаем из Resources — работает и в редакторе, и в билде
+        inputManager.inputActions = Resources.Load<InputActionAsset>("InputSystem_Actions");
+
+        if (inputManager.inputActions == null)
+        {
+            Debug.LogError("InputManager: Не удалось загрузить InputSystem_Actions! " +
+                "Убедитесь, что файл InputSystem_Actions.inputactions лежит в папке Assets/Resources/");
+        }
+
         DontDestroyOnLoad(go);
     }
 }
