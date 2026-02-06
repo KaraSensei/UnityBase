@@ -135,7 +135,7 @@ CapsuleCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_Radius: 0.5
   m_Height: 2
@@ -150,7 +150,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4824027781513152927}
-  - component: {fileID: 1628965636271413624}
+  - component: {fileID: 2867813187079678367}
+  - component: {fileID: 1475919082360423364}
+  - component: {fileID: 1563290078410148481}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -175,7 +177,7 @@ Transform:
   - {fileID: 6749953907797031108}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1628965636271413624
+--- !u!114 &2867813187079678367
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -184,6 +186,52 @@ MonoBehaviour:
   m_GameObject: {fileID: 7576200036586317813}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8e1568e7042d0a9429796c7352165bf0, type: 3}
+  m_Script: {fileID: 11500000, guid: efd6ed8c523263841b8c99b0101d29ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  playerData: {fileID: 11400000, guid: 5bd1562527fedda48bf9a49779587c9f, type: 2}
+  currentHealth: 0
+  currentMana: 0
+--- !u!143 &1475919082360423364
+CharacterController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7576200036586317813}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Height: 2
+  m_Radius: 0.5
+  m_SlopeLimit: 45
+  m_StepOffset: 0.3
+  m_SkinWidth: 0.08
+  m_MinMoveDistance: 0.001
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &1563290078410148481
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7576200036586317813}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60d3a0341cc465c489802b1b33949376, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerStats: {fileID: 2867813187079678367}
+  cameraTransform: {fileID: 6749953907797031108}
+  visualRoot: {fileID: 293616718043757109}
+  gravity: -9.81
+  groundedGravity: -2
+  sprintMultiplier: 1.5
