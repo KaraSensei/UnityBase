@@ -17,7 +17,6 @@ public class InputTest : MonoBehaviour
             Debug.Log($"Move: {move}");
 
         if (look != Vector2.zero)
-            Debug.Log($"Look: {look}");
 
         if (InputManager.Instance.JumpPressed)
             Debug.Log("Jump pressed!");
