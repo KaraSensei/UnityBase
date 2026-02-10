@@ -177,29 +177,13 @@ public class PlayerProgression : MonoBehaviour
         OnLevelUp?.Invoke(currentLevel);
 
         // Пример: усиливаем характеристики игрока при каждом уровне
-        if (playerStats != null && playerStats.playerData != null)
+        if (playerStats != null)
         {
-            // Увеличиваем максимальное здоровье и ману в данных
-            playerStats.playerData.maxHealth += 10f;
-            playerStats.playerData.maxMana += 5f;
-
-            // Полностью восстанавливаем здоровье до нового максимума
-            playerStats.currentHealth = playerStats.playerData.maxHealth;
-            playerStats.currentMana = Mathf.Clamp(
-                playerStats.currentMana,
-                0f,
-                playerStats.playerData.maxMana
-            );
-
-            playerStats.OnHealthChanged?.Invoke(
-                playerStats.currentHealth,
-                playerStats.playerData.maxHealth
-            );
-
-            playerStats.OnManaChanged?.Invoke(
-                playerStats.currentMana,
-                playerStats.playerData.maxMana
-            );
+            // Все изменения здоровья/маны и вызовы событий
+            // выполняем через отдельный метод в PlayerStats.
+            // Так события OnHealthChanged/OnManaChanged остаются
+            // инкапсулированы внутри PlayerStats.
+            playerStats.ApplyLevelUpBonuses(10f, 5f);
         }
     }
 }
@@ -215,9 +199,43 @@ public class PlayerProgression : MonoBehaviour
 - В примере при повышении уровня:
   - немного увеличивается `maxHealth` и `maxMana` в `PlayerData`;
   - здоровье игрока восстанавливается до нового максимума;
-  - вызываются события `OnHealthChanged`/`OnManaChanged`.
+  - вызывается метод `PlayerStats.ApplyLevelUpBonuses`, который изнутри `PlayerStats`
+    поднимает события `OnHealthChanged`/`OnManaChanged`. Так мы не пытаемся вызывать
+    события `OnHealthChanged`/`OnManaChanged` напрямую из `PlayerProgression`
+    (в C# событие можно вызывать только внутри того класса, где оно объявлено).
 
 > В реальном проекте можно вместо изменения `PlayerData` хранить “бонусы за уровни” отдельно, чтобы не менять ScriptableObject на лету. Для учебного проекта такой простой вариант подойдёт, чтобы показать идею.
+
+### 4.3. Изменение PlayerStats: метод ApplyLevelUpBonuses
+
+Чтобы корректно вызывать события `OnHealthChanged` и `OnManaChanged` (и не получать ошибку компиляции про события,
+которые можно вызывать только внутри класса-источника), в `PlayerStats` добавляется отдельный метод:
+
+```csharp
+public void ApplyLevelUpBonuses(float healthBonus, float manaBonus)
+{
+    if (playerData == null)
+    {
+        Debug.LogWarning("PlayerStats.ApplyLevelUpBonuses: PlayerData не назначен.", this);
+        return;
+    }
+
+    // Увеличиваем максимальные значения
+    playerData.maxHealth += healthBonus;
+    playerData.maxMana += manaBonus;
+
+    // Синхронизируем текущие значения с новыми максимумами
+    currentHealth = playerData.maxHealth;
+    currentMana = Mathf.Clamp(currentMana, 0f, playerData.maxMana);
+
+    // События вызываем здесь, внутри PlayerStats
+    OnHealthChanged?.Invoke(currentHealth, playerData.maxHealth);
+    OnManaChanged?.Invoke(currentMana, playerData.maxMana);
+}
+```
+
+`PlayerProgression` при этом ничего не знает о том, *как именно* меняются статы и поднимаются события —
+он просто вызывает `playerStats.ApplyLevelUpBonuses(10f, 5f);` при повышении уровня.
 
 ---
 

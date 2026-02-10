@@ -68,6 +68,34 @@ public class PlayerStats : MonoBehaviour
     }
 
     /// <summary>
+    /// Применяет бонусы за повышение уровня:
+    /// меняет maxHealth / maxMana и обновляет текущие значения
+    /// с подниманием событий OnHealthChanged / OnManaChanged.
+    /// Вызывать этот метод предпочтительнее, чем напрямую
+    /// менять currentHealth / currentMana и ScriptableObject снаружи.
+    /// </summary>
+    public void ApplyLevelUpBonuses(float healthBonus, float manaBonus)
+    {
+        if (playerData == null)
+        {
+            Debug.LogWarning("PlayerStats.ApplyLevelUpBonuses: PlayerData не назначен.", this);
+            return;
+        }
+
+        // Увеличиваем максимальные значения
+        playerData.maxHealth += healthBonus;
+        playerData.maxMana += manaBonus;
+
+        // Синхронизируем текущее с новыми максимумами
+        currentHealth = playerData.maxHealth;
+        currentMana = Mathf.Clamp(currentMana, 0f, playerData.maxMana);
+
+        // События вызываем здесь, внутри PlayerStats
+        OnHealthChanged?.Invoke(currentHealth, playerData.maxHealth);
+        OnManaChanged?.Invoke(currentMana, playerData.maxMana);
+    }
+
+    /// <summary>
     /// Наносит урон игроку.
     /// Не даёт опустить здоровье ниже 0 и при необходимости вызывает OnDeath.
     /// </summary>
