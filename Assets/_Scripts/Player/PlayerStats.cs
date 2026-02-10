@@ -1,63 +1,85 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 /// <summary>
-/// �������� �� ������� �������������� ������:
-/// ��������, ���� � �������, ��������� � ����.
+/// Отвечает за текущие характеристики игрока:
+/// здоровье, мана/энергия и связанные с ними события.
+/// Хранит ТЕКУЩИЕ значения в рантайме и даёт методы для урона и лечения.
 /// </summary>
 public class PlayerStats : MonoBehaviour
 {
-    [Header("������ ������")]
-    [Tooltip("ScriptableObject � �������� ����������� ������.")]
+    [Header("Данные игрока")]
+    [Tooltip("ScriptableObject с базовыми параметрами игрока (PlayerData).")]
     public PlayerData playerData;
 
-    [Header("������� ���������")]
-    [Tooltip("������� �������� ������.")]
+    [Header("Текущее состояние")]
+    [Tooltip("Текущее здоровье игрока.")]
     public float currentHealth;
 
-    [Tooltip("������� ���� (��� �������).")]
+    [Tooltip("Текущая мана (или энергия) игрока.")]
     public float currentMana;
 
-    // ������� ��� ����� � ������� ��������� (UI, ������� � �.�.)
-    public event Action<float, float> OnHealthChanged; // (�������, ������������)
-    public event Action<float, float> OnManaChanged;   // (�������, ������������)
+    // События для связи с другими системами (UI, эффекты и т.п.)
+    /// <summary>
+    /// Вызывается при изменении здоровья.
+    /// Параметры: текущее здоровье, максимальное здоровье.
+    /// </summary>
+    public event Action<float, float> OnHealthChanged;
+
+    /// <summary>
+    /// Вызывается при изменении маны / энергии.
+    /// Параметры: текущая мана, максимальная мана.
+    /// </summary>
+    public event Action<float, float> OnManaChanged;
+
+    /// <summary>
+    /// Вызывается один раз в момент "смерти" игрока (здоровье упало до 0).
+    /// </summary>
     public event Action OnDeath;
 
+    /// <summary>
+    /// Точка входа компонента.
+    /// При старте берёт стартовые значения из PlayerData.
+    /// </summary>
     private void Awake()
     {
         InitializeFromData();
     }
 
     /// <summary>
-    /// ������������� ������� �������� �� PlayerData.
+    /// Инициализирует текущие значения из PlayerData.
+    /// Можно вызвать повторно, например, при респауне.
     /// </summary>
     public void InitializeFromData()
     {
         if (playerData == null)
         {
-            Debug.LogError("PlayerStats: PlayerData �� ��������!", this);
+            Debug.LogError("PlayerStats: PlayerData не назначен!", this);
             return;
         }
 
+        // Берём стартовые значения и ограничиваем их в разумных пределах.
         currentHealth = Mathf.Clamp(playerData.maxHealth, 1f, float.MaxValue);
         currentMana = Mathf.Clamp(playerData.maxMana, 0f, float.MaxValue);
 
-        // ������������� ����������� ��������� ��������
+        // Уведомляем подписчиков о начальных значениях.
         OnHealthChanged?.Invoke(currentHealth, playerData.maxHealth);
         OnManaChanged?.Invoke(currentMana, playerData.maxMana);
     }
 
     /// <summary>
-    /// ��������� ����� ������.
+    /// Наносит урон игроку.
+    /// Не даёт опустить здоровье ниже 0 и при необходимости вызывает OnDeath.
     /// </summary>
     public void TakeDamage(float amount)
     {
         if (playerData == null)
         {
-            Debug.LogWarning("PlayerStats.TakeDamage: PlayerData �� ��������.", this);
+            Debug.LogWarning("PlayerStats.TakeDamage: PlayerData не назначен.", this);
             return;
         }
 
+        // Не реагируем на некорректный урон или если игрок уже мёртв.
         if (amount <= 0f || currentHealth <= 0f)
             return;
 
@@ -68,22 +90,24 @@ public class PlayerStats : MonoBehaviour
 
         if (currentHealth <= 0f)
         {
-            // ����� "�������"
+            // Игрок "умирает" — здесь можно запустить анимацию смерти, перезапуск уровня и т.п.
             OnDeath?.Invoke();
         }
     }
 
     /// <summary>
-    /// ������� ������.
+    /// Лечит игрока на указанное значение.
+    /// Не поднимает здоровье выше максимального и не лечит мёртвого игрока.
     /// </summary>
     public void Heal(float amount)
     {
         if (playerData == null)
         {
-            Debug.LogWarning("PlayerStats.Heal: PlayerData �� ��������.", this);
+            Debug.LogWarning("PlayerStats.Heal: PlayerData не назначен.", this);
             return;
         }
 
+        // Нет смысла лечить на неположительное значение или лечить мёртвого.
         if (amount <= 0f || currentHealth <= 0f)
             return;
 
@@ -94,16 +118,18 @@ public class PlayerStats : MonoBehaviour
     }
 
     /// <summary>
-    /// ��������� ���� (����� ���� ��� ������, ��� � ��������������).
+    /// Изменяет ману (может быть как расход, так и восстановление).
+    /// Положительное значение — восстановление, отрицательное — расход.
     /// </summary>
     public void AddMana(float amount)
     {
         if (playerData == null)
         {
-            Debug.LogWarning("PlayerStats.AddMana: PlayerData �� ��������.", this);
+            Debug.LogWarning("PlayerStats.AddMana: PlayerData не назначен.", this);
             return;
         }
 
+        // Если изменение практически равно 0, ничего не делаем.
         if (Mathf.Approximately(amount, 0f))
             return;
 

@@ -2,7 +2,9 @@ using UnityEngine;
 
 /// <summary>
 /// Player movement controller for 3D third-person.
-/// Uses InputManager to read input.
+/// Reads input from InputManager, moves a CharacterController
+/// relative to the camera and rotates the visual model in a
+/// "strafing" style (character always looks where the camera looks).
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -31,6 +33,10 @@ public class PlayerController : MonoBehaviour
     private Vector3 verticalVelocity;
     private bool isGrounded;
 
+    /// <summary>
+    /// Инициализирует ссылки на CharacterController, PlayerStats и камеру.
+    /// Вызывается один раз при создании объекта.
+    /// </summary>
     private void Awake()
     {
         characterController = GetComponent<CharacterController>();
@@ -42,6 +48,10 @@ public class PlayerController : MonoBehaviour
             cameraTransform = Camera.main.transform;
     }
 
+    /// <summary>
+    /// Главный игровой цикл контроллера.
+    /// Каждый кадр обрабатывает движение и прыжок, затем сбрасывает одноразовые флаги ввода в InputManager.
+    /// </summary>
     private void Update()
     {
         if (InputManager.Instance == null)
@@ -50,18 +60,25 @@ public class PlayerController : MonoBehaviour
         HandleMovement();
         HandleJump();
 
-        // reset one?frame button flags in InputManager
+        // В КОНЦЕ кадра сбрасываем "одноразовые" флаги кнопок (нажат в этом кадре).
+        // Это важно для действий типа прыжка/атаки: они должны срабатывать один раз,
+        // пока игровой код не успел их прочитать, а затем флаг нужно обнулить.
         InputManager.Instance.ResetButtonFlags();
     }
 
+    /// <summary>
+    /// Считает движение относительно камеры, применяет гравитацию
+    /// и двигает CharacterController. Также обновляет поворот визуальной
+    /// модели так, чтобы персонаж всегда смотрел туда же, куда и камера.
+    /// </summary>
     private void HandleMovement()
     {
         Vector2 moveInput = InputManager.Instance.MoveInput;
         Vector3 moveDirection = Vector3.zero;
 
         // Movement relative to camera:
-        // W/S ? move forward/back along camera forward,
-        // A/D ? move left/right along camera right (strafe).
+        // W/S — move forward/back along camera forward,
+        // A/D — move left/right along camera right (strafe).
         if (moveInput.sqrMagnitude > 0.001f && cameraTransform != null)
         {
             Vector3 forward = cameraTransform.forward;
@@ -92,6 +109,7 @@ public class PlayerController : MonoBehaviour
 
         Vector3 horizontalVelocity = moveDirection * speed;
 
+        // Ground check from CharacterController.
         isGrounded = characterController.isGrounded;
 
         if (isGrounded && verticalVelocity.y < 0f)
@@ -99,8 +117,10 @@ public class PlayerController : MonoBehaviour
             verticalVelocity.y = groundedGravity;
         }
 
+        // Apply gravity over time.
         verticalVelocity.y += gravity * Time.deltaTime;
 
+        // Final velocity combines horizontal movement and vertical velocity.
         Vector3 velocity = horizontalVelocity + verticalVelocity;
 
         characterController.Move(velocity * Time.deltaTime);
@@ -126,6 +146,10 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Обрабатывает прыжок: если игрок стоит на земле и кнопка прыжка
+    /// была нажата в этом кадре, задаёт вертикальную скорость вверх.
+    /// </summary>
     private void HandleJump()
     {
         if (!isGrounded)
