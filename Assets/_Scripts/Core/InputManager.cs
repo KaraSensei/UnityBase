@@ -14,6 +14,7 @@ public class InputManager : MonoBehaviour
     // Player Actions
     private InputAction moveAction;
     private InputAction lookAction;
+    private InputAction zoomAction;
     private InputAction jumpAction;
     private InputAction attackAction;
     private InputAction interactAction;
@@ -25,6 +26,7 @@ public class InputManager : MonoBehaviour
     // ÃÃ¥ÃªÃ³Ã¹Ã¨Ã¥ Ã§Ã­Ã Ã·Ã¥Ã­Ã¨Ã¿ (ÃªÃ½Ã¸Ã¨Ã°Ã³Ã¥Ã¬ Ã¤Ã«Ã¿ Ã¡Ã»Ã±Ã²Ã°Ã®Ã£Ã® Ã¤Ã®Ã±Ã²Ã³Ã¯Ã )
     public Vector2 MoveInput { get; private set; }
     public Vector2 LookInput { get; private set; }
+    public float ZoomInput { get; private set; }
     public bool JumpPressed { get; private set; }
     public bool AttackPressed { get; private set; }
     public bool InteractPressed { get; private set; }
@@ -76,6 +78,7 @@ public class InputManager : MonoBehaviour
         // ÃÃ®Ã«Ã³Ã·Ã Ã¥Ã¬ Actions Ã¨Ã§ Player Action Map
         moveAction = playerActionMap.FindAction("Move");
         lookAction = playerActionMap.FindAction("Look");
+        zoomAction = playerActionMap.FindAction("Zoom");
         jumpAction = playerActionMap.FindAction("Jump");
         attackAction = playerActionMap.FindAction("Attack");
         interactAction = playerActionMap.FindAction("Interact");
@@ -155,6 +158,7 @@ public class InputManager : MonoBehaviour
         // ÃÃ¨Ã²Ã Ã¥Ã¬ Ã²Ã¥ÃªÃ³Ã¹Ã¨Ã¥ Ã§Ã­Ã Ã·Ã¥Ã­Ã¨Ã¿ Ã¤Ã¥Ã©Ã±Ã²Ã¢Ã¨Ã©
         MoveInput = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
         LookInput = lookAction != null ? lookAction.ReadValue<Vector2>() : Vector2.zero;
+        ZoomInput = zoomAction != null ? zoomAction.ReadValue<Vector2>().y : 0f;
         SprintHeld = sprintAction != null && sprintAction.IsPressed();
         CrouchHeld = crouchAction != null && crouchAction.IsPressed();
 
@@ -246,6 +250,11 @@ public class InputManager : MonoBehaviour
     public Vector2 GetLookInput()
     {
         return LookInput;
+    }
+
+    public float GetZoomInput()
+    {
+        return ZoomInput;
     }
 
     public bool IsJumpPressed()

@@ -1250,7 +1250,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c73e16d164ec0e84cb168ff9eaa32994, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cmCamera: {fileID: 0}
+  cmCamera: {fileID: 1642967613}
   minCameraDistance: 2
   maxCameraDistance: 10
   zoomSpeed: 2

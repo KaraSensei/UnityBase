@@ -24,7 +24,7 @@ public class ThirdPersonFollowZoom : MonoBehaviour
         if (follow == null)
             return;
 
-        float scroll = Input.mouseScrollDelta.y;
+        float scroll = InputManager.Instance != null ? InputManager.Instance.GetZoomInput() : 0f; 
         if (Mathf.Abs(scroll) > 0.0001f)
         {
             follow.CameraDistance = Mathf.Clamp(
