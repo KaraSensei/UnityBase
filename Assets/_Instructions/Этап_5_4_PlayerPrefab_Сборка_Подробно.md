@@ -85,7 +85,7 @@
    - В поле `Player Data` перетащи ассет `PlayerData_Default` из `Assets/ScriptableObjects/Player/`.
 3. Запусти сцену и убедись, что:
    - Ошибок в консоли нет.
-   - В режиме Play у `PlayerStats` поля `currentHealth` и `currentMana` инициализировались (равны значениям из `PlayerData_Default`).
+   - В режиме Play у `PlayerStats` свойства `CurrentHealth` и `CurrentMana` инициализировались (равны значениям из `PlayerData_Default`).
 
 Если что‑то не так — вернись к урокам 5.1–5.2 и проверь код.
 
@@ -176,7 +176,7 @@ public class PlayerDebugHUD : MonoBehaviour
             return;
 
         GUI.Label(new Rect(10, 10, 300, 20),
-            $"HP: {playerStats.currentHealth} / {playerStats.playerData.maxHealth}");
+            $"HP: {playerStats.CurrentHealth} / {playerStats.playerData.maxHealth}");
     }
 }
 ```
