@@ -87,12 +87,26 @@ public class PlayerProgression : MonoBehaviour
     public PlayerStats playerStats;
 
     [Header("Уровень")]
+    [SerializeField]
     [Tooltip("Текущий уровень игрока.")]
-    public int currentLevel = 1;
+    private int currentLevel = 1;
 
     [Header("Опыт")]
+    [SerializeField]
     [Tooltip("Текущее количество опыта.")]
-    public float currentExperience = 0f;
+    private float currentExperience = 0f;
+
+    /// <summary>
+    /// Текущий уровень игрока (только для чтения).
+    /// Для изменения уровня используйте метод AddExperience().
+    /// </summary>
+    public int CurrentLevel => currentLevel;
+
+    /// <summary>
+    /// Текущее количество опыта игрока (только для чтения).
+    /// Для добавления опыта используйте метод AddExperience().
+    /// </summary>
+    public float CurrentExperience => currentExperience;
 
     [Tooltip("Базовое количество опыта для перехода с 1 на 2 уровень.")]
     public float baseExperienceToNextLevel = 100f;
@@ -191,6 +205,12 @@ public class PlayerProgression : MonoBehaviour
 
 Комментарий:
 
+- Поля `currentLevel` и `currentExperience` сделаны **приватными** (`private`) с атрибутом `[SerializeField]`, чтобы они были видны в инспекторе Unity, но не доступны напрямую из других скриптов.
+- Для чтения значений добавлены публичные свойства `CurrentLevel` и `CurrentExperience` (только для чтения).
+- Это обеспечивает **инкапсуляцию** — все изменения уровня и опыта проходят через метод `AddExperience()`, что гарантирует:
+  - правильный расчёт повышения уровня;
+  - вызов событий (`OnLevelUp`, `OnExperienceChanged`);
+  - единую точку контроля логики прогрессии.
 - Опыт и уровень живут **внутри** `PlayerProgression`, чтобы не раздувать `PlayerStats`.
 - Метод `AddExperience` можно вызывать из:
   - врагов (при смерти);
@@ -353,7 +373,7 @@ public class PlayerExperienceHUD : MonoBehaviour
             return;
 
         GUI.Label(new Rect(10, 30, 300, 20),
-            $"Уровень: {progression.currentLevel}, XP: {current}/{required}");
+            $"Уровень: {progression.CurrentLevel}, XP: {current}/{required}");
     }
 }
 ```
@@ -388,11 +408,14 @@ public class PlayerExperienceHUD : MonoBehaviour
 Ответь устно (или попроси ученика):
 
 1. Чем `PlayerProgression` отличается от `PlayerStats`?
-2. Какие плюсы даёт то, что опыт и уровни вынесены в отдельный компонент?
-3. Как бы ты изменила формулу опыта для:
+2. Почему поля `currentLevel` и `currentExperience` сделаны приватными?
+3. Как другие скрипты могут прочитать текущий уровень игрока?
+4. Какие плюсы даёт то, что опыт и уровни вынесены в отдельный компонент?
+5. Почему важно изменять опыт только через метод `AddExperience()`, а не напрямую?
+6. Как бы ты изменила формулу опыта для:
    - казуальной игры;
    - хардкорной RPG?
-4. Что происходит при повышении уровня в текущем коде и как можно это расширить (например, добавлением очков навыков)?
+7. Что происходит при повышении уровня в текущем коде и как можно это расширить (например, добавлением очков навыков)?
 
 Если код собирается, опыт начисляется и уровни растут — система игрока (на уровне этого этапа) готова, можно переходить к оружию (Этап 6).
 

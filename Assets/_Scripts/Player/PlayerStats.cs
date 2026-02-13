@@ -13,11 +13,25 @@ public class PlayerStats : MonoBehaviour
     public PlayerData playerData;
 
     [Header("Текущее состояние")]
+    [SerializeField]
     [Tooltip("Текущее здоровье игрока.")]
-    public float currentHealth;
+    private float currentHealth;
 
+    [SerializeField]
     [Tooltip("Текущая мана (или энергия) игрока.")]
-    public float currentMana;
+    private float currentMana;
+
+    /// <summary>
+    /// Текущее здоровье игрока (только для чтения).
+    /// Для изменения используйте методы TakeDamage() или Heal().
+    /// </summary>
+    public float CurrentHealth => currentHealth;
+
+    /// <summary>
+    /// Текущая мана игрока (только для чтения).
+    /// Для изменения используйте метод AddMana().
+    /// </summary>
+    public float CurrentMana => currentMana;
 
     // События для связи с другими системами (UI, эффекты и т.п.)
     /// <summary>

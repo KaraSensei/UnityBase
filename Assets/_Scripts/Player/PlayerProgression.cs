@@ -12,12 +12,26 @@ public class PlayerProgression : MonoBehaviour
     public PlayerStats playerStats;
 
     [Header("Уровень")]
+    [SerializeField]
     [Tooltip("Текущий уровень игрока.")]
-    public int currentLevel = 1;
+    private int currentLevel = 1;
 
     [Header("Опыт")]
+    [SerializeField]
     [Tooltip("Текущее количество опыта.")]
-    public float currentExperience = 0f;
+    private float currentExperience = 0f;
+
+    /// <summary>
+    /// Текущий уровень игрока (только для чтения).
+    /// Для изменения уровня используйте метод AddExperience().
+    /// </summary>
+    public int CurrentLevel => currentLevel;
+
+    /// <summary>
+    /// Текущее количество опыта игрока (только для чтения).
+    /// Для добавления опыта используйте метод AddExperience().
+    /// </summary>
+    public float CurrentExperience => currentExperience;
 
     [Tooltip("Базовое количество опыта для перехода с 1 на 2 уровень.")]
     public float baseExperienceToNextLevel = 100f;
