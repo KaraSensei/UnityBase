@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// Player movement controller for 3D third-person.
@@ -11,23 +11,23 @@ public class PlayerController : MonoBehaviour
 {
     [Header("References")]
     [Tooltip("Player stats component (health, move speed, jump force, etc.).")]
-    public PlayerStats playerStats;
+    private PlayerStats playerStats;
 
     [Tooltip("Camera transform used as reference for movement (usually main camera or Cinemachine virtual camera).")]
-    public Transform cameraTransform;
+    private Transform cameraTransform;
 
     [Tooltip("Root transform of the visual model (rotates to face camera).")]
-    public Transform visualRoot;
+    private Transform visualRoot;
 
     [Header("Movement & Physics")]
     [Tooltip("Gravity value (negative).")]
-    public float gravity = -9.81f;
+    private float gravity = -9.81f;
 
     [Tooltip("Small downward velocity to keep the character grounded.")]
-    public float groundedGravity = -2f;
+    private float groundedGravity = -2f;
 
     [Tooltip("Speed multiplier when sprinting.")]
-    public float sprintMultiplier = 1.5f;
+    private float sprintMultiplier = 1.5f;
 
     private CharacterController characterController;
     private Vector3 verticalVelocity;
