@@ -67,10 +67,9 @@
 
 `WeaponManager` — это компонент на объекте `Player`, который:
 
-- хранит ссылку на **текущее оружие** (`WeaponBase currentWeapon`);
-- знает, какое оружие выдавать игроку при старте (например, меч по умолчанию);
-- подписывается на событие атаки из `InputManager` и делегирует его текущему оружию:
-  - `currentWeapon.Attack();`
+- хранит ссылку на **текущее оружие** в приватном поле (снаружи доступ только через свойство `CurrentWeapon` только для чтения);
+- имеет **одно явно заданное оружие по умолчанию** (`defaultWeaponPrefab`) — в инспекторе обязательно указывается префаб; при старте игрок всегда экипируется им (никакой логики «если не назначено — тогда создаём»);
+- подписывается на событие атаки из `InputManager` и делегирует его текущему оружию: `currentWeapon.Attack();`
 - в будущем сможет:
   - переключать оружие (по кнопкам/через инвентарь);
   - интегрироваться с системой лута (подбор нового оружия).
@@ -110,61 +109,57 @@ using UnityEngine;
 /// Управляет оружием игрока:
 /// - хранит текущее оружие (WeaponBase),
 /// - реагирует на ввод атаки через InputManager,
-/// - в будущем сможет менять оружие.
+/// - при старте экипирует явно заданное оружие по умолчанию.
 /// </summary>
 public class WeaponManager : MonoBehaviour
 {
     [Header("Связи")]
+    [SerializeField]
     [Tooltip("Статы игрока (могут понадобиться для модификаторов урона, критов и т.п.).")]
-    public PlayerStats playerStats;
+    private PlayerStats playerStats;
 
-    [Tooltip("Текущее активное оружие игрока.")]
-    public WeaponBase currentWeapon;
+    [SerializeField]
+    [Tooltip("Префаб оружия по умолчанию — при старте игрок всегда экипируется им. Обязательно укажите в инспекторе.")]
+    private WeaponBase defaultWeaponPrefab;
 
-    [Header("Стартовое оружие")]
-    [Tooltip("Префаб оружия ближнего боя по умолчанию (например, меч).")]
-    public WeaponBase defaultMeleeWeaponPrefab;
-
+    [SerializeField]
     [Tooltip("Позиция, в которой будет располагаться оружие (например, рука игрока).")]
-    public Transform weaponSocket;
+    private Transform weaponSocket;
+
+    private WeaponBase currentWeapon;
+
+    /// <summary> Текущее активное оружие игрока (только чтение). </summary>
+    public WeaponBase CurrentWeapon => currentWeapon;
+
+    /// <summary> Статы игрока (для модификаторов урона и т.п.). </summary>
+    public PlayerStats PlayerStats => playerStats;
 
     private void Awake()
     {
         if (playerStats == null)
             playerStats = GetComponent<PlayerStats>();
 
-        // Если у нас нет текущего оружия, но указан стартовый префаб — создаём его
-        if (currentWeapon == null && defaultMeleeWeaponPrefab != null)
+        if (defaultWeaponPrefab == null)
         {
-            EquipNewWeapon(defaultMeleeWeaponPrefab);
+            Debug.LogError("WeaponManager: не указано оружие по умолчанию (Default Weapon Prefab). Назначьте префаб в инспекторе.", this);
+            return;
         }
-        else if (currentWeapon != null)
-        {
-            // Убедимся, что владелец и позиция корректно назначены
-            SetupWeapon(currentWeapon);
-        }
+
+        EquipNewWeapon(defaultWeaponPrefab);
     }
 
     private void OnEnable()
     {
-        // Подписка на событие атаки из InputManager
         if (InputManager.Instance != null)
-        {
             InputManager.Instance.OnAttackPressed += HandleAttackPressed;
-        }
     }
 
     private void OnDisable()
     {
         if (InputManager.Instance != null)
-        {
             InputManager.Instance.OnAttackPressed -= HandleAttackPressed;
-        }
     }
 
-    /// <summary>
-    /// Обработчик нажатия кнопки атаки.
-    /// </summary>
     private void HandleAttackPressed()
     {
         if (currentWeapon == null)
@@ -172,13 +167,9 @@ public class WeaponManager : MonoBehaviour
             Debug.LogWarning("WeaponManager: у игрока нет текущего оружия, атаковать нечем.");
             return;
         }
-
         currentWeapon.Attack();
     }
 
-    /// <summary>
-    /// Экипировать оружие из префаба (создаёт его экземпляр как дочерний объект в weaponSocket).
-    /// </summary>
     public void EquipNewWeapon(WeaponBase weaponPrefab)
     {
         if (weaponPrefab == null)
@@ -187,7 +178,6 @@ public class WeaponManager : MonoBehaviour
             return;
         }
 
-        // Если есть старое оружие как дочерний объект — удаляем
         if (currentWeapon != null)
         {
             Destroy(currentWeapon.gameObject);
@@ -195,26 +185,16 @@ public class WeaponManager : MonoBehaviour
         }
 
         Transform parent = weaponSocket != null ? weaponSocket : transform;
-
         WeaponBase newWeapon = Instantiate(weaponPrefab, parent);
         currentWeapon = newWeapon;
-
         SetupWeapon(currentWeapon);
     }
 
-    /// <summary>
-    /// Настроить только что экипированное оружие:
-    /// - указать владельца,
-    /// - обнулить локальную позицию/вращение.
-    /// </summary>
     private void SetupWeapon(WeaponBase weapon)
     {
-        if (weapon == null)
-            return;
+        if (weapon == null) return;
 
         weapon.owner = transform;
-
-        // Привязываем оружие к сокету: локальная позиция/вращение = 0
         weapon.transform.localPosition = Vector3.zero;
         weapon.transform.localRotation = Quaternion.identity;
     }
@@ -223,12 +203,11 @@ public class WeaponManager : MonoBehaviour
 
 Разбор:
 
+- **Инкапсуляция:** все настраиваемые ссылки — `[SerializeField] private`; текущее оружие хранится в приватном поле, снаружи доступ только через свойство `CurrentWeapon` (только чтение).
+- **Явное оружие по умолчанию:** в инспекторе обязательно указывается один префаб (`Default Weapon Prefab`); при старте всегда вызывается `EquipNewWeapon(defaultWeaponPrefab)` — без веток «если не назначено».
 - `WeaponManager` **не** знает, ближнее это оружие или дальнее — он работает с типом `WeaponBase`.
 - Метод `HandleAttackPressed` вызывается только при нажатии кнопки атаки (спасибо `InputManager`).
-- Метод `EquipNewWeapon`:
-  - удаляет старое оружие (если было);
-  - создаёт новое из префаба;
-  - позиционирует его в `weaponSocket` (обычно рука/косточка персонажа).
+- Метод `EquipNewWeapon`: удаляет старое оружие (если было), создаёт новое из префаба, позиционирует в `weaponSocket`.
 
 ---
 
@@ -252,7 +231,7 @@ public class WeaponManager : MonoBehaviour
 3. В полях `WeaponManager`:
    - `Player Stats` можно оставить пустым — скрипт сам найдёт компонент `PlayerStats` на этом объекте;
    - `Weapon Socket` — перетащи сюда созданный объект `WeaponSocket`;
-   - `Default Melee Weapon Prefab` — перетащи префаб `Sword_Melee` (из урока 6.3).
+   - `Default Weapon Prefab` — **обязательно** перетащи префаб `Sword_Melee` (из урока 6.3). При старте игрок всегда экипируется этим оружием; отдельного поля «Current Weapon» в инспекторе нет — текущее оружие задаётся только кодом.
 4. Сохрани префаб `Player`.
 
 ---
@@ -268,8 +247,8 @@ public class WeaponManager : MonoBehaviour
 Ожидаемое поведение:
 
 - При первом входе в сцену:
-  - у игрока в иерархии (под `WeaponSocket`) появляется экземпляр меча (`MeleeWeapon`);
-  - в `Inspector` у `WeaponManager` поле `Current Weapon` заполнено ссылкой на этот компонент.
+  - у игрока в иерархии (под `WeaponSocket`) появляется экземпляр меча (`MeleeWeapon`) — он создаётся из назначенного в инспекторе `Default Weapon Prefab`;
+  - текущее оружие можно проверить через свойство `CurrentWeapon` в коде или по наличию дочернего объекта оружия под `WeaponSocket`.
 - При нажатии `Attack`:
   - событие `OnAttackPressed` в `InputManager` срабатывает;
   - вызывается `WeaponManager.HandleAttackPressed()`;
@@ -308,7 +287,8 @@ public class WeaponManager : MonoBehaviour
 
 1. Какие три системы участвуют в атаке, начиная от нажатия клавиши и заканчивая выполнением `Attack()`?
 2. Почему `WeaponManager` не должен знать, ближнее оружие или дальнее сейчас экипировано?
-3. Что нужно изменить, чтобы при старте игрок получал не меч, а лук?
+3. Что нужно изменить, чтобы при старте игрок получал не меч, а лук?  
+   *Подсказка: в инспекторе у `WeaponManager` одно поле задаёт оружие по умолчанию.*
 
 Если ты можешь уверенно ответить на эти вопросы и атака в игре работает — Этап 6 («Оружие и наследование») можно считать завершённым на уровне базовой архитектуры. Далее — переход к Этапу 7 (инвентарь) и Этапу 8 (враги и реальный урон).
 

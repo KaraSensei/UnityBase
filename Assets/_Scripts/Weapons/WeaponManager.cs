@@ -1,42 +1,46 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Управляет оружием игрока:
 /// - хранит текущее оружие (WeaponBase),
 /// - реагирует на ввод атаки через InputManager,
-/// - в будущем сможет менять оружие.
+/// - при старте экипирует явно заданное оружие по умолчанию.
 /// </summary>
 public class WeaponManager : MonoBehaviour
 {
     [Header("Связи")]
+    [SerializeField]
     [Tooltip("Статы игрока (могут понадобиться для модификаторов урона, критов и т.п.).")]
-    public PlayerStats playerStats;
+    private PlayerStats playerStats;
 
-    [Tooltip("Текущее активное оружие игрока.")]
-    public WeaponBase currentWeapon;
+    [SerializeField]
+    [Tooltip("Префаб оружия по умолчанию — при старте игрок всегда экипируется им. Обязательно укажите в инспекторе.")]
+    private WeaponBase defaultWeaponPrefab;
 
-    [Header("Стартовое оружие")]
-    [Tooltip("Префаб оружия ближнего боя по умолчанию (например, меч).")]
-    public WeaponBase defaultMeleeWeaponPrefab;
-
+    [SerializeField]
     [Tooltip("Позиция, в которой будет располагаться оружие (например, рука игрока).")]
-    public Transform weaponSocket;
+    private Transform weaponSocket;
+
+    private WeaponBase currentWeapon;
+
+    /// <summary> Текущее активное оружие игрока (только чтение). </summary>
+    public WeaponBase CurrentWeapon => currentWeapon;
+
+    /// <summary> Статы игрока (для модификаторов урона и т.п.). </summary>
+    public PlayerStats PlayerStats => playerStats;
 
     private void Awake()
     {
         if (playerStats == null)
             playerStats = GetComponent<PlayerStats>();
 
-        // Если у нас нет текущего оружия, но указан стартовый префаб — создаём его
-        if (currentWeapon == null && defaultMeleeWeaponPrefab != null)
+        if (defaultWeaponPrefab == null)
         {
-            EquipNewWeapon(defaultMeleeWeaponPrefab);
+            Debug.LogError("WeaponManager: не указано оружие по умолчанию (Default Weapon Prefab). Назначьте префаб в инспекторе.", this);
+            return;
         }
-        else if (currentWeapon != null)
-        {
-            // Убедимся, что владелец и позиция корректно назначены
-            SetupWeapon(currentWeapon);
-        }
+
+        EquipNewWeapon(defaultWeaponPrefab);
     }
 
     private void OnEnable()
