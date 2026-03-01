@@ -63,16 +63,16 @@
 
 ## 3. Дизайн WeaponManager
 
-### 3.1. Задачи WeaponManager
+### 3.1. Задачи WeaponManager (в проекте — вариант B)
 
-`WeaponManager` — это компонент на объекте `Player`, который:
+В проекте используется **вариант B**: все оружия хранятся в префабе игрока как дочерние объекты; смена оружия — включение/выключение (`SetActive`), без `Instantiate`/`Destroy`. Подробно см. **[Этап 6.6: Смена оружия (вариант B)](Этап_6_6_Смена_оружия_Вариант_B.md)**.
 
-- хранит ссылку на **текущее оружие** в приватном поле (снаружи доступ только через свойство `CurrentWeapon` только для чтения);
-- имеет **одно явно заданное оружие по умолчанию** (`defaultWeaponPrefab`) — в инспекторе обязательно указывается префаб; при старте игрок всегда экипируется им (никакой логики «если не назначено — тогда создаём»);
-- подписывается на событие атаки из `InputManager` и делегирует его текущему оружию: `currentWeapon.Attack();`
-- в будущем сможет:
-  - переключать оружие (по кнопкам/через инвентарь);
-  - интегрироваться с системой лута (подбор нового оружия).
+`WeaponManager`:
+
+- хранит **массив экземпляров оружия** (`weaponInstances`) и список **доступных** для переключения (`availableWeapons`);
+- текущее оружие — приватное поле, снаружи только свойство `CurrentWeapon` (только чтение);
+- подписывается на `OnAttackPressed`, а также на `OnWeaponNextPressed` и `OnWeaponPrevPressed` (кнопки **2** и **1** — следующее/предыдущее оружие в списке доступных);
+- при старте экипирует одно оружие по индексу в списке доступных (`defaultWeaponIndexInAvailable`).
 
 ### 3.2. Почему через события, а не через прямой опрос в Update
 
@@ -98,141 +98,46 @@
 3. Назови скрипт **`WeaponManager`**.
 4. Открой его в редакторе.
 
-### 4.2. Реализация WeaponManager
+### 4.2. Реализация WeaponManager (вариант B)
 
-Замените содержимое на следующий код:
+Скрипт в проекте реализован по **варианту B**: массив `weaponInstances`, список `availableWeapons`, смена через `SetActive`. Полный код см. в `Assets/_Scripts/Weapons/WeaponManager.cs`. Кратко:
 
-```csharp
-using UnityEngine;
-
-/// <summary>
-/// Управляет оружием игрока:
-/// - хранит текущее оружие (WeaponBase),
-/// - реагирует на ввод атаки через InputManager,
-/// - при старте экипирует явно заданное оружие по умолчанию.
-/// </summary>
-public class WeaponManager : MonoBehaviour
-{
-    [Header("Связи")]
-    [SerializeField]
-    [Tooltip("Статы игрока (могут понадобиться для модификаторов урона, критов и т.п.).")]
-    private PlayerStats playerStats;
-
-    [SerializeField]
-    [Tooltip("Префаб оружия по умолчанию — при старте игрок всегда экипируется им. Обязательно укажите в инспекторе.")]
-    private WeaponBase defaultWeaponPrefab;
-
-    [SerializeField]
-    [Tooltip("Позиция, в которой будет располагаться оружие (например, рука игрока).")]
-    private Transform weaponSocket;
-
-    private WeaponBase currentWeapon;
-
-    /// <summary> Текущее активное оружие игрока (только чтение). </summary>
-    public WeaponBase CurrentWeapon => currentWeapon;
-
-    /// <summary> Статы игрока (для модификаторов урона и т.п.). </summary>
-    public PlayerStats PlayerStats => playerStats;
-
-    private void Awake()
-    {
-        if (playerStats == null)
-            playerStats = GetComponent<PlayerStats>();
-
-        if (defaultWeaponPrefab == null)
-        {
-            Debug.LogError("WeaponManager: не указано оружие по умолчанию (Default Weapon Prefab). Назначьте префаб в инспекторе.", this);
-            return;
-        }
-
-        EquipNewWeapon(defaultWeaponPrefab);
-    }
-
-    private void OnEnable()
-    {
-        if (InputManager.Instance != null)
-            InputManager.Instance.OnAttackPressed += HandleAttackPressed;
-    }
-
-    private void OnDisable()
-    {
-        if (InputManager.Instance != null)
-            InputManager.Instance.OnAttackPressed -= HandleAttackPressed;
-    }
-
-    private void HandleAttackPressed()
-    {
-        if (currentWeapon == null)
-        {
-            Debug.LogWarning("WeaponManager: у игрока нет текущего оружия, атаковать нечем.");
-            return;
-        }
-        currentWeapon.Attack();
-    }
-
-    public void EquipNewWeapon(WeaponBase weaponPrefab)
-    {
-        if (weaponPrefab == null)
-        {
-            Debug.LogWarning("WeaponManager.EquipNewWeapon: префаб оружия не задан.");
-            return;
-        }
-
-        if (currentWeapon != null)
-        {
-            Destroy(currentWeapon.gameObject);
-            currentWeapon = null;
-        }
-
-        Transform parent = weaponSocket != null ? weaponSocket : transform;
-        WeaponBase newWeapon = Instantiate(weaponPrefab, parent);
-        currentWeapon = newWeapon;
-        SetupWeapon(currentWeapon);
-    }
-
-    private void SetupWeapon(WeaponBase weapon)
-    {
-        if (weapon == null) return;
-
-        weapon.owner = transform;
-        weapon.transform.localPosition = Vector3.zero;
-        weapon.transform.localRotation = Quaternion.identity;
-    }
-}
-```
+- **Поля:** `playerStats`, `weaponInstances` (WeaponBase[]), `weaponAvailableAtStart` (bool[]), `defaultWeaponIndexInAvailable` (int). Список `availableWeapons` строится в Awake.
+- **Awake:** построить список доступных оружий; экипировать оружие по умолчанию через `EquipByEnableDisable`.
+- **OnEnable/OnDisable:** подписка на `OnAttackPressed`, `OnWeaponNextPressed`, `OnWeaponPrevPressed`.
+- **SwitchToNextWeapon / SwitchToPrevWeapon:** смена индекса в `availableWeapons` по кругу и вызов `EquipByEnableDisable`.
+- **EquipByEnableDisable:** включить только выбранное оружие, остальные выключить; вызвать `SetupWeapon`.
+- **UnlockWeaponBySlotIndex(int):** добавить оружие по индексу слота в список доступных (для лута/квестов).
 
 Разбор:
 
-- **Инкапсуляция:** все настраиваемые ссылки — `[SerializeField] private`; текущее оружие хранится в приватном поле, снаружи доступ только через свойство `CurrentWeapon` (только чтение).
-- **Явное оружие по умолчанию:** в инспекторе обязательно указывается один префаб (`Default Weapon Prefab`); при старте всегда вызывается `EquipNewWeapon(defaultWeaponPrefab)` — без веток «если не назначено».
-- `WeaponManager` **не** знает, ближнее это оружие или дальнее — он работает с типом `WeaponBase`.
-- Метод `HandleAttackPressed` вызывается только при нажатии кнопки атаки (спасибо `InputManager`).
-- Метод `EquipNewWeapon`: удаляет старое оружие (если было), создаёт новое из префаба, позиционирует в `weaponSocket`.
+- **Инкапсуляция:** настройки через `[SerializeField] private`; текущее оружие — только чтение через `CurrentWeapon`.
+- **Листание только по доступным:** хранится список `availableWeapons`; кнопки 1 и 2 меняют индекс в этом списке. Подробнее — [Этап 6.6](Этап_6_6_Смена_оружия_Вариант_B.md).
+- `WeaponManager` работает с типом `WeaponBase` и не знает о Melee/Ranged.
 
 ---
 
-## 5. Подключение WeaponManager к Player
+## 5. Подключение WeaponManager к Player (вариант B)
 
-### 5.1. Создание сокета для оружия
+### 5.1. Оружия как дочерние объекты игрока
 
 1. Открой префаб `Player` (см. урок 5.4).
-2. Внутри объекта `Player` создай пустой `GameObject`, назови его, например, `WeaponSocket`:
-   - его можно разместить:
-     - как дочерний объект к визуальной модели (например, к руке);
-     - или просто в центре игрока для начала (для теста не критично).
-3. Сохраните префаб `Player`.
+2. Создай при необходимости пустой объект `WeaponSocket` (например, под рукой модели).
+3. Добавь в префаб игрока **экземпляры оружия** (не префабы в смысле перетаскивания «как экземпляр» — объекты с компонентами MeleeWeapon/RangedWeapon и назначенным WeaponData). Например: дочерние объекты `Sword`, `Bow` под `WeaponSocket`. Их позиции настрой в префабе.
+4. Сохрани префаб.
 
-### 5.2. Добавление WeaponManager на Player
+### 5.2. Настройка WeaponManager
 
-1. Выбери объект `Player` в префабе или в сцене.
-2. В Inspector:
-   - нажми `Add Component`;
-   - добавь `WeaponManager`.
-3. В полях `WeaponManager`:
-   - `Player Stats` можно оставить пустым — скрипт сам найдёт компонент `PlayerStats` на этом объекте;
-   - `Weapon Socket` — перетащи сюда созданный объект `WeaponSocket`;
-   - `Default Weapon Prefab` — **обязательно** перетащи префаб `Sword_Melee` (из урока 6.3). При старте игрок всегда экипируется этим оружием; отдельного поля «Current Weapon» в инспекторе нет — текущее оружие задаётся только кодом.
-4. Сохрани префаб `Player`.
+1. Выбери объект `Player`, добавь компонент `WeaponManager`.
+2. В полях:
+   - `Player Stats` — можно оставить пустым (автопоиск на том же объекте).
+   - **Weapon Instances** — массив: перетащи сюда все дочерние объекты оружия (Sword, Bow и т.д.) в нужном порядке. Порядок = порядок переключения по кнопкам 1/2.
+   - **Weapon Available At Start** — опционально: массив bool (по одному на слот). `true` = слот доступен при старте. Если не задано или короче — все слоты доступны.
+   - **Default Weapon Index In Available** — индекс стартового оружия в списке доступных (0 = первое).
+3. В Input System уже должны быть действия **Next** (клавиша 2) и **Previous** (клавиша 1) в Action Map Player — смена оружия вперёд/назад.
+4. Сохрани префаб.
+
+Подробнее о списке доступных и кнопках 1/2: [Этап 6.6: Смена оружия (вариант B)](Этап_6_6_Смена_оружия_Вариант_B.md).
 
 ---
 
@@ -247,14 +152,11 @@ public class WeaponManager : MonoBehaviour
 Ожидаемое поведение:
 
 - При первом входе в сцену:
-  - у игрока в иерархии (под `WeaponSocket`) появляется экземпляр меча (`MeleeWeapon`) — он создаётся из назначенного в инспекторе `Default Weapon Prefab`;
-  - текущее оружие можно проверить через свойство `CurrentWeapon` в коде или по наличию дочернего объекта оружия под `WeaponSocket`.
-- При нажатии `Attack`:
-  - событие `OnAttackPressed` в `InputManager` срабатывает;
-  - вызывается `WeaponManager.HandleAttackPressed()`;
-  - вызывается `currentWeapon.Attack()`:
-    - если это `MeleeWeapon`, в консоли появятся логи о ближней атаке;
-    - если рядом есть объекты на подходящем слое, будет залогировано, что по ним «попали».
+  - у игрока активно одно оружие (остальные дочерние объекты оружия выключены); текущее можно проверить через `CurrentWeapon` или по включённому GameObject в иерархии.
+- Клавиша **2** (Next) — переключение на следующее в списке доступных; **1** (Previous) — на предыдущее.
+- При нажатии `Attack` (ЛКМ и т.д.):
+  - вызывается `currentWeapon.Attack()` (логи ближней/дальней атаки в зависимости от текущего оружия);
+  - при луке создаётся снаряд и летит вперёд.
 
 Если всё это работает — значит, цепочка **Input → WeaponManager → WeaponBase/наследник** настроена правильно.
 
@@ -288,7 +190,7 @@ public class WeaponManager : MonoBehaviour
 1. Какие три системы участвуют в атаке, начиная от нажатия клавиши и заканчивая выполнением `Attack()`?
 2. Почему `WeaponManager` не должен знать, ближнее оружие или дальнее сейчас экипировано?
 3. Что нужно изменить, чтобы при старте игрок получал не меч, а лук?  
-   *Подсказка: в инспекторе у `WeaponManager` одно поле задаёт оружие по умолчанию.*
+   *Подсказка: порядок в массиве Weapon Instances и индекс Default Weapon Index In Available (или порядок доступных в Weapon Available At Start).*
 
 Если ты можешь уверенно ответить на эти вопросы и атака в игре работает — Этап 6 («Оружие и наследование») можно считать завершённым на уровне базовой архитектуры. Далее — переход к Этапу 7 (инвентарь) и Этапу 8 (враги и реальный урон).
 
