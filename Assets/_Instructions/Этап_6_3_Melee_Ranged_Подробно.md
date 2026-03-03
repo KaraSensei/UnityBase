@@ -65,7 +65,8 @@
 3. Назови скрипт **`MeleeWeapon`**.
 4. Открой его в редакторе.
 
-Замените содержимое на следующий код:
+Замените содержимое на следующий код.  
+Здесь для полей используется `[SerializeField] private`, чтобы показать инкапсуляцию, но при этом сохранить удобную настройку в инспекторе:
 
 ```csharp
 using UnityEngine;
@@ -78,13 +79,16 @@ public class MeleeWeapon : WeaponBase
 {
     [Header("Параметры ближней атаки")]
     [Tooltip("Точка, откуда считается удар (обычно у меча/руки).")]
-    public Transform attackOrigin;
+    [SerializeField]
+    private Transform attackOrigin;
 
     [Tooltip("Радиус удара. Если 0, можно использовать Range из WeaponData.")]
-    public float hitRadius = 1.5f;
+    [SerializeField]
+    private float hitRadius = 1.5f;
 
     [Tooltip("Слои, по которым можно наносить урон (враги, разрушаемые объекты).")]
-    public LayerMask hitLayers;
+    [SerializeField]
+    private LayerMask hitLayers;
 
     public override void Attack()
     {
@@ -93,7 +97,7 @@ public class MeleeWeapon : WeaponBase
 
         StartAttackCooldown();
 
-        if (weaponData == null)
+        if (WeaponData == null)
         {
             Debug.LogWarning($"{name}: WeaponData не назначен, ближняя атака невозможна.", this);
             return;
@@ -102,10 +106,10 @@ public class MeleeWeapon : WeaponBase
         // Если не указан радиус, используем Range из WeaponData
         float radius = hitRadius > 0f ? hitRadius : Range;
 
-        // Если attackOrigin не задан, используем позицию owner или самого оружия
+        // Если attackOrigin не задан, используем позицию Owner или самого оружия
         Vector3 origin = attackOrigin != null
             ? attackOrigin.position
-            : (owner != null ? owner.position : transform.position);
+            : (Owner != null ? Owner.position : transform.position);
 
         // Простой поиск попаданий
         Collider[] hits = Physics.OverlapSphere(origin, radius, hitLayers);
@@ -123,17 +127,8 @@ public class MeleeWeapon : WeaponBase
                 // Здесь позже, на Этапе 8, мы будем вызывать метод получения урона
                 // у врагов (например, через EnemyStats или интерфейс IDamageable).
                 Debug.Log($"Попали по объекту: {collider.name}");
-
-                // Псевдокод на будущее (НЕ реализуем сейчас, чтобы не ломать компиляцию):
-                // var damageable = collider.GetComponent<IDamageable>();
-                // if (damageable != null)
-                // {
-                //     damageable.TakeDamage(Damage);
-                // }
             }
         }
-
-        // Здесь же в будущем можно запускать анимацию атаки и звук удара.
     }
 
     private void OnDrawGizmosSelected()
@@ -141,10 +136,10 @@ public class MeleeWeapon : WeaponBase
         // Рисуем сферу удара в редакторе, чтобы видеть радиус
         Gizmos.color = Color.red;
 
-        float radius = hitRadius > 0f ? hitRadius : (weaponData != null ? weaponData.range : 1.5f);
+        float radius = hitRadius > 0f ? hitRadius : (WeaponData != null ? WeaponData.range : 1.5f);
         Vector3 origin = attackOrigin != null
             ? attackOrigin.position
-            : (owner != null ? owner.position : transform.position);
+            : (Owner != null ? Owner.position : transform.position);
 
         Gizmos.DrawWireSphere(origin, radius);
     }
@@ -187,7 +182,8 @@ public class MeleeWeapon : WeaponBase
 1. В `Assets/Scripts/Weapons/`:
    - ПКМ → `Create` → `C# Script`;
    - назови скрипт **`Projectile`**.
-2. Открой и замени содержимое:
+2. Открой и замени содержимое.  
+Мы используем приватные поля с `[SerializeField]` и свойства, чтобы не нарушать инкапсуляцию:
 
 ```csharp
 using UnityEngine;
@@ -199,16 +195,48 @@ using UnityEngine;
 public class Projectile : MonoBehaviour
 {
     [Tooltip("Скорость полёта снаряда (единиц в секунду).")]
-    public float speed = 20f;
+    [SerializeField]
+    private float speed = 20f;
 
     [Tooltip("Максимальная дистанция, после которой снаряд уничтожается.")]
-    public float maxDistance = 20f;
+    [SerializeField]
+    private float maxDistance = 20f;
 
     [Tooltip("Урон, который этот снаряд должен нанести при попадании.")]
-    public float damage = 10f;
+    [SerializeField]
+    private float damage = 10f;
 
     [Tooltip("Слои, по которым может быть нанесён урон.")]
-    public LayerMask hitLayers;
+    [SerializeField]
+    private LayerMask hitLayers;
+
+    /// <summary>Скорость полёта снаряда.</summary>
+    public float Speed
+    {
+        get => speed;
+        set => speed = value;
+    }
+
+    /// <summary>Максимальная дистанция полёта.</summary>
+    public float MaxDistance
+    {
+        get => maxDistance;
+        set => maxDistance = value;
+    }
+
+    /// <summary>Урон снаряда.</summary>
+    public float Damage
+    {
+        get => damage;
+        set => damage = value;
+    }
+
+    /// <summary>Маска слоёв, по которым снаряд может наносить урон.</summary>
+    public LayerMask HitLayers
+    {
+        get => hitLayers;
+        set => hitLayers = value;
+    }
 
     private Vector3 _startPosition;
 
@@ -232,7 +260,7 @@ public class Projectile : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        // Проверяем, попадает ли объект под маску слоёв
+        // Проверка: слой объекта есть в маске hitLayers?
         if ((hitLayers.value & (1 << other.gameObject.layer)) == 0)
             return;
 
@@ -288,7 +316,8 @@ public class Projectile : MonoBehaviour
 1. В `Assets/Scripts/Weapons/`:
    - ПКМ → `Create` → `C# Script`;
    - назови скрипт **`RangedWeapon`**.
-2. Открой и замени содержимое:
+2. Открой и замени содержимое.  
+Как и в остальных скриптах, используем приватные поля + `[SerializeField]`, а снаряд настраиваем через его свойства, не лезя в поля напрямую:
 
 ```csharp
 using UnityEngine;
@@ -301,13 +330,16 @@ public class RangedWeapon : WeaponBase
 {
     [Header("Параметры дальнего боя")]
     [Tooltip("Точка, из которой вылетают снаряды (конец ствола/лука).")]
-    public Transform shootOrigin;
+    [SerializeField]
+    private Transform shootOrigin;
 
     [Tooltip("Скорость снаряда. Если 0, используется значение по умолчанию в префабе.")]
-    public float projectileSpeedOverride = 0f;
+    [SerializeField]
+    private float projectileSpeedOverride = 0f;
 
     [Tooltip("Слои, по которым может быть нанесён урон.")]
-    public LayerMask projectileHitLayers;
+    [SerializeField]
+    private LayerMask projectileHitLayers;
 
     public override void Attack()
     {
@@ -316,13 +348,13 @@ public class RangedWeapon : WeaponBase
 
         StartAttackCooldown();
 
-        if (weaponData == null)
+        if (WeaponData == null)
         {
             Debug.LogWarning($"{name}: WeaponData не назначен, дальняя атака невозможна.", this);
             return;
         }
 
-        if (weaponData.projectilePrefab == null)
+        if (WeaponData.projectilePrefab == null)
         {
             Debug.LogWarning($"{name}: projectilePrefab в WeaponData не назначен, нечего стрелять.", this);
             return;
@@ -331,15 +363,15 @@ public class RangedWeapon : WeaponBase
         // Определяем точку выстрела
         Vector3 spawnPosition = shootOrigin != null
             ? shootOrigin.position
-            : (owner != null ? owner.position : transform.position);
+            : (Owner != null ? Owner.position : transform.position);
 
         Quaternion spawnRotation = shootOrigin != null
             ? shootOrigin.rotation
-            : (owner != null ? owner.rotation : transform.rotation);
+            : (Owner != null ? Owner.rotation : transform.rotation);
 
         // Создаём снаряд
         GameObject projectileObject = Instantiate(
-            weaponData.projectilePrefab,
+            WeaponData.projectilePrefab,
             spawnPosition,
             spawnRotation
         );
@@ -347,13 +379,14 @@ public class RangedWeapon : WeaponBase
         Projectile projectile = projectileObject.GetComponent<Projectile>();
         if (projectile != null)
         {
-            projectile.damage = Damage;
-            projectile.maxDistance = Range;
-            projectile.hitLayers = projectileHitLayers;
+            // Настраиваем снаряд через свойства, не трогая его приватные поля.
+            projectile.Damage = Damage;
+            projectile.MaxDistance = Range;
+            projectile.HitLayers = projectileHitLayers;
 
             if (projectileSpeedOverride > 0f)
             {
-                projectile.speed = projectileSpeedOverride;
+                projectile.Speed = projectileSpeedOverride;
             }
         }
 

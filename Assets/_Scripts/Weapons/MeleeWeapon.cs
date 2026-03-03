@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Оружие ближнего боя.
@@ -8,13 +8,16 @@ public class MeleeWeapon : WeaponBase
 {
     [Header("Параметры ближней атаки")]
     [Tooltip("Точка, откуда считается удар (обычно у меча/руки).")]
-    public Transform attackOrigin;
+    [SerializeField]
+    private Transform attackOrigin;
 
     [Tooltip("Радиус удара. Если 0, можно использовать Range из WeaponData.")]
-    public float hitRadius = 1.5f;
+    [SerializeField]
+    private float hitRadius = 1.5f;
 
     [Tooltip("Слои, по которым можно наносить урон (враги, разрушаемые объекты).")]
-    public LayerMask hitLayers;
+    [SerializeField]
+    private LayerMask hitLayers;
 
     public override void Attack()
     {
@@ -23,7 +26,7 @@ public class MeleeWeapon : WeaponBase
 
         StartAttackCooldown();
 
-        if (weaponData == null)
+        if (WeaponData == null)
         {
             Debug.LogWarning($"{name}: WeaponData не назначен, ближняя атака невозможна.", this);
             return;
@@ -35,7 +38,7 @@ public class MeleeWeapon : WeaponBase
         // Если attackOrigin не задан, используем позицию owner или самого оружия
         Vector3 origin = attackOrigin != null
             ? attackOrigin.position
-            : (owner != null ? owner.position : transform.position);
+            : (Owner != null ? Owner.position : transform.position);
 
         // Простой поиск попаданий
         Collider[] hits = Physics.OverlapSphere(origin, radius, hitLayers);
@@ -71,10 +74,10 @@ public class MeleeWeapon : WeaponBase
         // Рисуем сферу удара в редакторе, чтобы видеть радиус
         Gizmos.color = Color.red;
 
-        float radius = hitRadius > 0f ? hitRadius : (weaponData != null ? weaponData.range : 1.5f);
+        float radius = hitRadius > 0f ? hitRadius : (WeaponData != null ? WeaponData.range : 1.5f);
         Vector3 origin = attackOrigin != null
             ? attackOrigin.position
-            : (owner != null ? owner.position : transform.position);
+            : (Owner != null ? Owner.position : transform.position);
 
         Gizmos.DrawWireSphere(origin, radius);
     }

@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Простой снаряд: летит вперёд и уничтожается при столкновении или по достижении дальности.
@@ -7,16 +7,48 @@
 public class Projectile : MonoBehaviour
 {
     [Tooltip("Скорость полёта снаряда (единиц в секунду).")]
-    public float speed = 20f;
+    [SerializeField]
+    private float speed = 20f;
 
     [Tooltip("Максимальная дистанция, после которой снаряд уничтожается.")]
-    public float maxDistance = 20f;
+    [SerializeField]
+    private float maxDistance = 20f;
 
     [Tooltip("Урон, который этот снаряд должен нанести при попадании.")]
-    public float damage = 10f;
+    [SerializeField]
+    private float damage = 10f;
 
     [Tooltip("Слои, по которым может быть нанесён урон.")]
-    public LayerMask hitLayers;
+    [SerializeField]
+    private LayerMask hitLayers;
+
+    /// <summary>Скорость полёта снаряда.</summary>
+    public float Speed
+    {
+        get => speed;
+        set => speed = value;
+    }
+
+    /// <summary>Максимальная дистанция полёта.</summary>
+    public float MaxDistance
+    {
+        get => maxDistance;
+        set => maxDistance = value;
+    }
+
+    /// <summary>Урон снаряда.</summary>
+    public float Damage
+    {
+        get => damage;
+        set => damage = value;
+    }
+
+    /// <summary>Маска слоёв, по которым снаряд может наносить урон.</summary>
+    public LayerMask HitLayers
+    {
+        get => hitLayers;
+        set => hitLayers = value;
+    }
 
     private Vector3 _startPosition;
 
@@ -40,7 +72,13 @@ public class Projectile : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        // Проверяем, попадает ли объект под маску слоёв
+        // Проверка: слой объекта есть в маске hitLayers?
+        // hitLayers.value  - целое число, где каждый бит = один слой (LayerMask)
+        // other.gameObject.layer - номер слоя (0..31) у объекта, в который мы врезались
+        // (1 << other.gameObject.layer) - двигаем 1 влево на номер слоя и получаем маску "только этот слой"
+        // Операция & (один амперсанд) — это ПОБИТОВОЕ И, оно оставляет только те биты,
+        // которые одновременно =1 и в hitLayers.value, и в (1 << layer).
+        // Если результат == 0, значит ни один бит не совпал — этот слой НЕ входит в маску, выходим.
         if ((hitLayers.value & (1 << other.gameObject.layer)) == 0)
             return;
 

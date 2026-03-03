@@ -32,6 +32,8 @@ public class InputManager : MonoBehaviour
     private InputAction crouchAction;
     private InputAction pauseAction;
     private InputAction cancelAction;
+    private InputAction weaponNextAction;
+    private InputAction weaponPrevAction;
 
     // Текущие значения (кэшируем для быстрого доступа из других скриптов)
     public Vector2 MoveInput { get; private set; }
@@ -49,6 +51,10 @@ public class InputManager : MonoBehaviour
     public System.Action OnInteractPressed;
     public System.Action OnPausePressed;
     public System.Action OnCancelPressed;
+    /// <summary> Смена оружия: следующее в списке (кнопка 2). </summary>
+    public System.Action OnWeaponNextPressed;
+    /// <summary> Смена оружия: предыдущее в списке (кнопка 1). </summary>
+    public System.Action OnWeaponPrevPressed;
 
     /// <summary>
     /// Инициализирует Singleton и делает объект переживающим смену сцен.
@@ -106,6 +112,8 @@ public class InputManager : MonoBehaviour
         pauseAction = playerActionMap.FindAction("Pause");
         if (uiActionMap != null)
             cancelAction = uiActionMap.FindAction("Cancel");
+        weaponNextAction = playerActionMap.FindAction("Next");
+        weaponPrevAction = playerActionMap.FindAction("Previous");
 
         // Подписываемся на события кнопок (одноразовые срабатывания performed)
         if (jumpAction != null)
@@ -118,6 +126,10 @@ public class InputManager : MonoBehaviour
             pauseAction.performed += OnPausePerformed;
         if (cancelAction != null)
             cancelAction.performed += OnCancelPerformed;
+        if (weaponNextAction != null)
+            weaponNextAction.performed += OnWeaponNextPerformed;
+        if (weaponPrevAction != null)
+            weaponPrevAction.performed += OnWeaponPrevPerformed;
 
         // По умолчанию включаем ввод для игрока
         EnablePlayerInput();
@@ -170,6 +182,10 @@ public class InputManager : MonoBehaviour
             pauseAction.performed -= OnPausePerformed;
         if (cancelAction != null)
             cancelAction.performed -= OnCancelPerformed;
+        if (weaponNextAction != null)
+            weaponNextAction.performed -= OnWeaponNextPerformed;
+        if (weaponPrevAction != null)
+            weaponPrevAction.performed -= OnWeaponPrevPerformed;
     }
 
     /// <summary>
@@ -240,6 +256,15 @@ public class InputManager : MonoBehaviour
         OnCancelPressed?.Invoke();
     }
 
+    private void OnWeaponNextPerformed(InputAction.CallbackContext context)
+    {
+        OnWeaponNextPressed?.Invoke();
+    }
+
+    private void OnWeaponPrevPerformed(InputAction.CallbackContext context)
+    {
+        OnWeaponPrevPressed?.Invoke();
+    }
 
     /// <summary>
     /// Сбрасывает «одноразовые» флаги нажатий.
