@@ -1702,6 +1702,18 @@ PrefabInstance:
       propertyPath: 'weaponAvailableAtStart.Array.data[1]'
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 1563290078410148481, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
+      propertyPath: visualRoot
+      value: 
+      objectReference: {fileID: 5039514878538700880}
+    - target: {fileID: 1563290078410148481, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
+      propertyPath: playerStats
+      value: 
+      objectReference: {fileID: 5039514878538700881}
+    - target: {fileID: 1563290078410148481, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
+      propertyPath: cameraTransform
+      value: 
+      objectReference: {fileID: 1606899759}
     - target: {fileID: 4824027781513152927, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 24.05
@@ -1776,6 +1788,22 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9a41658f6d6e8a94195c63fa93d1d2aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &5039514878538700880 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 293616718043757109, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
+  m_PrefabInstance: {fileID: 5039514878538700876}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5039514878538700881 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2867813187079678367, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
+  m_PrefabInstance: {fileID: 5039514878538700876}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: efd6ed8c523263841b8c99b0101d29ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!1001 &5345816585673597335
