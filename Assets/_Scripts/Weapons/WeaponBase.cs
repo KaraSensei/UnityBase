@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Базовый класс для любого оружия.
@@ -9,11 +9,32 @@ public abstract class WeaponBase : MonoBehaviour
 {
     [Header("Данные оружия")]
     [Tooltip("ScriptableObject с базовыми параметрами оружия.")]
-    public WeaponData weaponData;
+    [SerializeField]
+    private WeaponData weaponData;
 
     [Header("Владелец оружия (опционально)")]
     [Tooltip("Кто держит это оружие (например, Player). Используется для анимаций/направления атаки.")]
-    public Transform owner;
+    [SerializeField]
+    protected Transform owner;
+
+    /// <summary>Публичный доступ к WeaponData с возможностью смены в рантайме.</summary>
+    public WeaponData WeaponData
+    {
+        get => weaponData;
+        set => weaponData = value;
+    }
+
+    /// <summary>
+    /// Публичный доступ к владельцу оружия.
+    /// В этом проекте смены владельца (враг → игрок) нет, но свойство оставлено,
+    /// чтобы при необходимости можно было передавать одно и то же оружие разным персонажам
+    /// (например, если враг уроняет оружие, а игрок его подбирает).
+    /// </summary>
+    public Transform Owner
+    {
+        get => owner;
+        set => owner = value;
+    }
 
     // Время, когда оружие снова готово атаковать (Time.time)
     protected float nextAttackTime = 0f;

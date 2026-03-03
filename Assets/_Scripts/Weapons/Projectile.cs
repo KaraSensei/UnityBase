@@ -7,16 +7,48 @@ using UnityEngine;
 public class Projectile : MonoBehaviour
 {
     [Tooltip("Скорость полёта снаряда (единиц в секунду).")]
-    public float speed = 20f;
+    [SerializeField]
+    private float speed = 20f;
 
     [Tooltip("Максимальная дистанция, после которой снаряд уничтожается.")]
-    public float maxDistance = 20f;
+    [SerializeField]
+    private float maxDistance = 20f;
 
     [Tooltip("Урон, который этот снаряд должен нанести при попадании.")]
-    public float damage = 10f;
+    [SerializeField]
+    private float damage = 10f;
 
     [Tooltip("Слои, по которым может быть нанесён урон.")]
-    public LayerMask hitLayers;
+    [SerializeField]
+    private LayerMask hitLayers;
+
+    /// <summary>Скорость полёта снаряда.</summary>
+    public float Speed
+    {
+        get => speed;
+        set => speed = value;
+    }
+
+    /// <summary>Максимальная дистанция полёта.</summary>
+    public float MaxDistance
+    {
+        get => maxDistance;
+        set => maxDistance = value;
+    }
+
+    /// <summary>Урон снаряда.</summary>
+    public float Damage
+    {
+        get => damage;
+        set => damage = value;
+    }
+
+    /// <summary>Маска слоёв, по которым снаряд может наносить урон.</summary>
+    public LayerMask HitLayers
+    {
+        get => hitLayers;
+        set => hitLayers = value;
+    }
 
     private Vector3 _startPosition;
 

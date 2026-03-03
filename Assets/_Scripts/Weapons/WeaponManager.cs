@@ -178,7 +178,7 @@ public class WeaponManager : MonoBehaviour
         if (weapon == null) return;
         // Сохраняем ссылку на владельца (обычно это игрок), чтобы оружие знало,
         // от кого «летят» пули/урон.
-        weapon.owner = transform;
+        weapon.Owner = transform;
         // Привязываем оружие к локальному нулю и нулевой ротации относительно игрока,
         // чтобы оно занимало правильное положение в руке/точке крепления.
         weapon.transform.localPosition = Vector3.zero;

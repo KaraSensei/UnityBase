@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Оружие дальнего боя.
@@ -8,13 +8,16 @@ public class RangedWeapon : WeaponBase
 {
     [Header("Параметры дальнего боя")]
     [Tooltip("Точка, из которой вылетают снаряды (конец ствола/лука).")]
-    public Transform shootOrigin;
+    [SerializeField]
+    private Transform shootOrigin;
 
     [Tooltip("Скорость снаряда. Если 0, используется значение по умолчанию в префабе.")]
-    public float projectileSpeedOverride = 0f;
+    [SerializeField]
+    private float projectileSpeedOverride = 0f;
 
     [Tooltip("Слои, по которым может быть нанесён урон.")]
-    public LayerMask projectileHitLayers;
+    [SerializeField]
+    private LayerMask projectileHitLayers;
 
     public override void Attack()
     {
@@ -23,13 +26,13 @@ public class RangedWeapon : WeaponBase
 
         StartAttackCooldown();
 
-        if (weaponData == null)
+        if (WeaponData == null)
         {
             Debug.LogWarning($"{name}: WeaponData не назначен, дальняя атака невозможна.", this);
             return;
         }
 
-        if (weaponData.projectilePrefab == null)
+        if (WeaponData.projectilePrefab == null)
         {
             Debug.LogWarning($"{name}: projectilePrefab в WeaponData не назначен, нечего стрелять.", this);
             return;
@@ -38,15 +41,15 @@ public class RangedWeapon : WeaponBase
         // Определяем точку выстрела
         Vector3 spawnPosition = shootOrigin != null
             ? shootOrigin.position
-            : (owner != null ? owner.position : transform.position);
+            : (Owner != null ? Owner.position : transform.position);
 
         Quaternion spawnRotation = shootOrigin != null
             ? shootOrigin.rotation
-            : (owner != null ? owner.rotation : transform.rotation);
+            : (Owner != null ? Owner.rotation : transform.rotation);
 
         // Создаём снаряд
         GameObject projectileObject = Instantiate(
-            weaponData.projectilePrefab,
+            WeaponData.projectilePrefab,
             spawnPosition,
             spawnRotation
         );
@@ -54,13 +57,14 @@ public class RangedWeapon : WeaponBase
         Projectile projectile = projectileObject.GetComponent<Projectile>();
         if (projectile != null)
         {
-            projectile.damage = Damage;
-            projectile.maxDistance = Range;
-            projectile.hitLayers = projectileHitLayers;
+            // Настраиваем снаряд через публичные свойства, а не прямой доступ к полям.
+            projectile.Damage = Damage;
+            projectile.MaxDistance = Range;
+            projectile.HitLayers = projectileHitLayers;
 
             if (projectileSpeedOverride > 0f)
             {
-                projectile.speed = projectileSpeedOverride;
+                projectile.Speed = projectileSpeedOverride;
             }
         }
 
