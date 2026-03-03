@@ -11,23 +11,23 @@ public class PlayerController : MonoBehaviour
 {
     [Header("References")]
     [Tooltip("Player stats component (health, move speed, jump force, etc.).")]
-    private PlayerStats playerStats;
+    [SerializeField] private PlayerStats playerStats;
 
     [Tooltip("Camera transform used as reference for movement (usually main camera or Cinemachine virtual camera).")]
-    private Transform cameraTransform;
+    [SerializeField] private Transform cameraTransform;
 
     [Tooltip("Root transform of the visual model (rotates to face camera).")]
-    private Transform visualRoot;
+    [SerializeField] private Transform visualRoot;
 
     [Header("Movement & Physics")]
     [Tooltip("Gravity value (negative).")]
-    private float gravity = -9.81f;
+    [SerializeField] private float gravity = -9.81f;
 
     [Tooltip("Small downward velocity to keep the character grounded.")]
-    private float groundedGravity = -2f;
+    [SerializeField] private float groundedGravity = -2f;
 
     [Tooltip("Speed multiplier when sprinting.")]
-    private float sprintMultiplier = 1.5f;
+    [SerializeField] private float sprintMultiplier = 1.5f;
 
     private CharacterController characterController;
     private Vector3 verticalVelocity;
