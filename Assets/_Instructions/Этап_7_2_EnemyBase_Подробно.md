@@ -37,26 +37,47 @@
 ### 0.3. Связь с SOLID
 
 - **S — Single Responsibility**:
-  - `EnemyData` отвечает за данные;
-  - `EnemyBase` — за общую логику врага (здоровье, движение, поиск цели);
-  - будущие наследники — за специфическое поведение (ближний/дальний бой).
+  - `EnemyData` отвечает за данные (базовые числа);
+  - `EnemyStats` — за состояние и статы конкретного экземпляра врага (текущее здоровье, расчёт урона, смерть);
+  - `EnemyBase` — за общую логику поведения (поиск цели, движение, базовая атака);
+  - будущие наследники `EnemyBase` — за специфическое поведение (ближний/дальний бой, боссы).
 - **O — Open/Closed**:
   - мы можем добавлять новые типы врагов (`FlyingEnemy`, `StealthEnemy`), не изменяя код `EnemySpawner` и `EnemyFactory`.
 - **L — Liskov Substitution**:
   - любой наследник `EnemyBase` должен корректно работать там, где ожидается `EnemyBase`.
 
+### 0.4. Теория: слои, теги и Raycast
+
+Прежде чем использовать поиск цели в коде, важно понимать три связанных понятия в Unity:
+
+- **Слои (Layers)** — используются для **фильтрации физики и лучей**.  
+  - В `Project Settings → Tags and Layers` можно создать слой `Player` и назначить его объекту игрока.  
+  - Поле `LayerMask playerLayer` в `EnemyBase` говорит `Physics.OverlapSphere`, **по каким слоям вообще искать коллайдеры**.
+- **Теги (Tags)** — текстовые ярлыки для объектов (например, `Player`, `Enemy`).  
+  - Один и тот же тег можно повесить на несколько объектов.  
+  - Тег удобен, когда нам нужно понять **«кто это»**, а не управлять физикой. В этом уроке мы храним тег игрока в поле `playerTag`, чтобы позже иметь возможность дополнительно проверять цель.
+- **Raycast** — «луч» из точки в направлении, который проверяет, **что он «ударил» по пути**.  
+  - Пример: `Physics.Raycast(origin, direction, out hitInfo, maxDistance, layerMask)`.  
+  - В этом уроке мы используем **OverlapSphere** (проверка «кто находится внутри сферы»), но на презентации полезно показать, что Raycast позволяет:
+    - проверять, есть ли **прямая видимость** до игрока (нет ли стены между врагом и игроком);
+    - делать точечные проверки под ногами (есть ли земля под врагом/игроком);
+    - использовать те же **LayerMask** для фильтрации, по чему луч может «попасть».
+
+Важно:  
+- **Слои** — про то, какие объекты участвуют в физике и лучах.  
+- **Теги** — про то, «кто это» логически (игрок, враг, предмет).  
+- **Raycast/OverlapSphere** — инструменты физики, которые используют слои и помогают врагам «видеть» игрока.
+
 ---
 
 ## 1. Цели урока
 
-- **Техническая цель**: создать класс `EnemyBase`, который:
-  - хранит ссылку на `EnemyData`;
-  - управляет здоровьем врага;
-  - реализует базовую логику поиска цели и движения;
-  - предоставляет методы для получения урона и смерти.
-- **Обучающая цель**: показать, как базовый класс задаёт «контракт» для всех врагов и как наследование упрощает архитектуру.
+- **Техническая цель**: создать два связанных класса:
+  - `EnemyStats` — компонент, который хранит ссылку на `EnemyData`, текущее здоровье и реализует получение урона/смерть;
+  - `EnemyBase` — компонент, который использует `EnemyStats` для чисел и реализует базовую логику поиска цели, движения и атаки.
+- **Обучающая цель**: показать, как разделить статы и поведение между разными компонентами и как базовый класс задаёт «контракт» для всех врагов.
 
-После урока у тебя будет фундамент, от которого будут наследоваться специализированные враги (если понадобится).
+После урока у тебя будет фундамент: статы (`EnemyStats`) и базовое поведение (`EnemyBase`), от которого при желании можно наследоваться для специализированных врагов.
 
 ---
 
@@ -72,59 +93,67 @@
 
 ---
 
-## 3. Проектирование структуры EnemyBase
+## 3. Проектирование структуры EnemyStats и EnemyBase
 
-Подумай, что должно быть общим для ЛЮБОГО врага:
+Подумай, что должно быть общим для ЛЮБОГО врага, но раздели это на **статы** и **поведение**:
 
-- **Данные**:
-  - ссылка на `EnemyData` (здоровье, скорость, урон и т.д.).
-- **Состояние**:
+- **Данные (конфигурация)**:
+  - `EnemyData` — ScriptableObject с базовыми числами (здоровье, урон, скорость и т.д.).
+- **Состояние и статы конкретного экземпляра** — это зона ответственности `EnemyStats`:
+  - ссылка на `EnemyData`;
   - текущее здоровье;
-  - цель (игрок или другой объект).
-- **Поведение**:
-  - получение урона (`TakeDamage`);
-  - смерть (`Die`);
-  - поиск цели (`FindTarget`);
-  - движение к цели (`MoveTowardsTarget`);
-  - атака (`Attack` — базовая реализация).
+  - доступ к урону, скорости движения, дальности атаки/обнаружения, награде за убийство;
+  - получение урона (`TakeDamage`) и смерть (`Die`).
+- **Поведение/логика движения и атаки** — это зона ответственности `EnemyBase`:
+  - хранит цель (игрок или другой объект);
+  - ищет цель (`FindTarget`);
+  - двигается к цели (`MoveTowardsTarget`);
+  - атакует цель (`Attack`, базовая реализация);
+  - использует значения из `EnemyStats` (скорость, дальности, урон), но сам не хранит числа.
 
 Из этого следует структура:
 
-- Поле `EnemyData enemyData`.
-- Поле `float currentHealth` — текущее здоровье.
-- Поле `Transform target` — текущая цель (обычно игрок).
-- Свойства:
-  - `MaxHealth`, `MoveSpeed`, `Damage`, `AttackRange`, `DetectionRange` — удобные геттеры к данным.
-- Методы:
-  - `void TakeDamage(float damage)` — получение урона.
-  - `void Die()` — смерть врага.
-  - `void FindTarget()` — поиск цели в радиусе обнаружения.
-  - `void MoveTowardsTarget()` — движение к цели.
-  - `void Attack()` — атака (базовая реализация, можно переопределить в наследниках).
+- Компонент `EnemyStats`:
+  - поле `EnemyData enemyData`;
+  - приватное поле `currentHealth`;
+  - свойства `MaxHealth`, `MoveSpeed`, `Damage`, `AttackRange`, `DetectionRange`, `ExperienceReward`;
+  - методы:
+    - `InitializeFromData()` — установка текущего здоровья по данным;
+    - `TakeDamage(float damage)` — получение урона и проверка смерти;
+    - `Die()` — базовая логика смерти врага.
+- Компонент `EnemyBase`:
+  - ссылка на `EnemyStats stats`;
+  - поле `Transform target` — текущая цель (обычно игрок);
+  - поля `LayerMask playerLayer` и `string playerTag` для поиска цели;
+  - методы:
+    - `FindTarget()` — поиск цели в радиусе обнаружения, используя `stats.DetectionRange`;
+    - `MoveTowardsTarget()` — движение к цели с использованием `stats.MoveSpeed`;
+    - `Attack()` — базовая атака, использующая `stats.Damage`.
 
 ---
 
-## 4. Создание скрипта EnemyBase
+## 4. Создание скриптов EnemyStats и EnemyBase
 
 ### 4.1. Шаги в Unity
 
 1. В окне `Project` перейди в `Assets/_Scripts/Enemies/`.
-2. ПКМ → `Create` → `C# Script`.
-3. Назови скрипт **`EnemyBase`**.
-4. Открой его в редакторе.
+2. ПКМ → `Create` → `C# Script` и создай два скрипта:
+   - **`EnemyStats`**;
+   - **`EnemyBase`**.
+3. Открой оба скрипта в редакторе.
 
-### 4.2. Реализация EnemyBase
+### 4.2. Реализация EnemyStats
 
-Замените содержимое файла на следующий код (набирай вручную, не копируй вслепую):
+Скрипт `EnemyStats` отвечает за связь с `EnemyData` и текущее состояние врага. Пример итогового кода (набирай сам, понимая каждую строку):
 
 ```csharp
 using UnityEngine;
 
 /// <summary>
-/// Базовый класс для любого врага.
-/// Хранит ссылку на EnemyData и реализует базовую логику здоровья, движения и атаки.
+/// Отвечает за статы врага: здоровье, урон, скорость и т.п.
+/// Читает базовые числа из EnemyData и хранит текущее состояние.
 /// </summary>
-public class EnemyBase : MonoBehaviour
+public class EnemyStats : MonoBehaviour
 {
     [Header("Данные врага")]
     [Tooltip("ScriptableObject с базовыми параметрами врага.")]
@@ -134,105 +163,30 @@ public class EnemyBase : MonoBehaviour
     [Tooltip("Текущее здоровье врага.")]
     [SerializeField] private float currentHealth;
 
-    [Tooltip("Текущая цель врага (обычно игрок).")]
-    public Transform target;
-
-    [Header("Настройки поиска цели")]
-    [Tooltip("Слой, на котором находится игрок.")]
-    public LayerMask playerLayer;
-
-    [Tooltip("Тег игрока.")]
-    public string playerTag = "Player";
-
-    // Свойства для удобного доступа к данным
     public float MaxHealth => enemyData != null ? enemyData.maxHealth : 0f;
     public float MoveSpeed => enemyData != null ? enemyData.moveSpeed : 0f;
     public float Damage => enemyData != null ? enemyData.damage : 0f;
     public float AttackRange => enemyData != null ? enemyData.attackRange : 0f;
     public float DetectionRange => enemyData != null ? enemyData.detectionRange : 0f;
+    public float ExperienceReward => enemyData != null ? enemyData.experienceReward : 0f;
 
     private void Awake()
     {
-        // Инициализация здоровья при создании
+        InitializeFromData();
+    }
+
+    /// <summary>
+    /// Инициализирует текущее здоровье из EnemyData.
+    /// </summary>
+    public void InitializeFromData()
+    {
         if (enemyData != null)
         {
             currentHealth = enemyData.maxHealth;
         }
-    }
-
-    private void Start()
-    {
-        // Поиск цели при старте
-        FindTarget();
-    }
-
-    private void Update()
-    {
-        // Если цель потеряна, пытаемся найти новую
-        if (target == null)
-        {
-            FindTarget();
-            return;
-        }
-
-        // Проверяем расстояние до цели
-        float distanceToTarget = Vector3.Distance(transform.position, target.position);
-
-        // Если цель слишком далеко, теряем её
-        if (distanceToTarget > DetectionRange)
-        {
-            target = null;
-            return;
-        }
-
-        // Если цель в радиусе атаки — атакуем
-        if (distanceToTarget <= AttackRange)
-        {
-            Attack();
-        }
         else
         {
-            // Иначе движемся к цели
-            MoveTowardsTarget();
-        }
-    }
-
-    /// <summary>
-    /// Поиск цели (игрока) в радиусе обнаружения.
-    /// </summary>
-    public void FindTarget()
-    {
-        // Ищем объекты с тегом Player в радиусе обнаружения
-        Collider[] colliders = Physics.OverlapSphere(transform.position, DetectionRange, playerLayer);
-
-        if (colliders.Length > 0)
-        {
-            // Берём первый найденный объект как цель
-            target = colliders[0].transform;
-            Debug.Log($"{name}: нашёл цель — {target.name}");
-        }
-    }
-
-    /// <summary>
-    /// Движение к цели.
-    /// </summary>
-    public void MoveTowardsTarget()
-    {
-        if (target == null)
-            return;
-
-        // Направление к цели
-        Vector3 direction = (target.position - transform.position).normalized;
-        direction.y = 0f; // Игнорируем вертикальную составляющую для 2D или top-down
-
-        // Движение
-        transform.position += direction * MoveSpeed * Time.deltaTime;
-
-        // Поворот к цели (опционально)
-        if (direction != Vector3.zero)
-        {
-            Quaternion lookRotation = Quaternion.LookRotation(direction);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+            currentHealth = 0f;
         }
     }
 
@@ -258,79 +212,187 @@ public class EnemyBase : MonoBehaviour
     /// </summary>
     public virtual void Die()
     {
-        Debug.Log($"{name}: умер!");
+        Debug.Log($"{name}: умер! Награда за убийство: {ExperienceReward} опыта.");
 
-        // Здесь позже можно добавить:
-        // - выпадение лута
-        // - начисление опыта игроку
-        // - анимацию смерти
-        // - звук смерти
+        // Здесь позже можно:
+        // - начислять опыт игроку;
+        // - вызывать события;
+        // - проигрывать анимации/звуки.
 
         Destroy(gameObject);
     }
+}
+```
 
-    /// <summary>
-    /// Атака цели (базовая реализация).
-    /// </summary>
-    public virtual void Attack()
+### 4.3. Реализация EnemyBase
+
+Скрипт `EnemyBase` отвечает за поведение: поиск цели, движение, атаку. Он не хранит числа напрямую, а использует `EnemyStats`:
+
+```csharp
+using UnityEngine;
+
+/// <summary>
+/// Базовое поведение врага: поиск цели, движение, атака.
+/// Все статы (здоровье, урон, скорости) живут в EnemyStats.
+/// </summary>
+public class EnemyBase : MonoBehaviour
+{
+    [Header("Компоненты")]
+    [Tooltip("Компонент со статами врага.")]
+    public EnemyStats stats;
+
+    [Header("Цель")]
+    [Tooltip("Текущая цель врага (обычно игрок).")]
+    public Transform target;
+
+    [Header("Настройки поиска цели")]
+    [Tooltip("Слой, на котором находится игрок.")]
+    public LayerMask playerLayer;
+
+    [Tooltip("Тег игрока.")]
+    public string playerTag = "Player";
+
+    private void Awake()
     {
-        if (target == null)
+        if (stats == null)
+        {
+            stats = GetComponent<EnemyStats>();
+        }
+    }
+
+    private void Start()
+    {
+        FindTarget();
+    }
+
+    private void Update()
+    {
+        if (stats == null)
             return;
 
-        Debug.Log($"{name}: атакует {target.name} с уроном {Damage}");
+        if (target == null)
+        {
+            FindTarget();
+            return;
+        }
 
-        // Здесь позже, на Этапе 8, мы будем вызывать метод получения урона
-        // у игрока через интерфейс IDamageable:
-        // var damageable = target.GetComponent<IDamageable>();
-        // if (damageable != null)
-        // {
-        //     damageable.TakeDamage(Damage);
-        // }
+        float distanceToTarget = Vector3.Distance(transform.position, target.position);
+
+        if (distanceToTarget > stats.DetectionRange)
+        {
+            target = null;
+            return;
+        }
+
+        if (distanceToTarget <= stats.AttackRange)
+        {
+            Attack();
+        }
+        else
+        {
+            MoveTowardsTarget();
+        }
+    }
+
+    public void FindTarget()
+    {
+        if (stats == null)
+            return;
+
+        Collider[] colliders = Physics.OverlapSphere(transform.position, stats.DetectionRange, playerLayer);
+
+        if (colliders.Length == 0)
+            return;
+
+        target = colliders[0].transform;
+
+        if (!string.IsNullOrEmpty(playerTag) && !target.CompareTag(playerTag))
+        {
+            foreach (Collider col in colliders)
+            {
+                if (col.CompareTag(playerTag))
+                {
+                    target = col.transform;
+                    break;
+                }
+            }
+        }
+
+        if (target != null)
+        {
+            Debug.Log($"{name}: нашёл цель — {target.name}");
+        }
+    }
+
+    public void MoveTowardsTarget()
+    {
+        if (stats == null || target == null)
+            return;
+
+        Vector3 direction = (target.position - transform.position).normalized;
+        direction.y = 0f;
+
+        transform.position += direction * stats.MoveSpeed * Time.deltaTime;
+
+        if (direction != Vector3.zero)
+        {
+            Quaternion lookRotation = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+        }
+    }
+
+    public virtual void Attack()
+    {
+        if (stats == null || target == null)
+            return;
+
+        Debug.Log($"{name}: атакует {target.name} с уроном {stats.Damage}");
+
+        // На Этапе 8 здесь можно будет вызывать IDamageable у цели и передавать stats.Damage.
     }
 
     private void OnDrawGizmosSelected()
     {
-        // Рисуем радиус обнаружения и радиус атаки в редакторе
-        if (enemyData == null)
+        if (stats == null)
             return;
 
-        // Радиус обнаружения (жёлтый)
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, DetectionRange);
+        Gizmos.DrawWireSphere(transform.position, stats.DetectionRange);
 
-        // Радиус атаки (красный)
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, AttackRange);
+        Gizmos.DrawWireSphere(transform.position, stats.AttackRange);
     }
 }
 ```
 
 Обрати внимание:
 
-- `EnemyBase` наследуется от `MonoBehaviour`, потому что мы будем вешать его на объекты сцены/префабы.
-- Метод `Die()` помечен как `virtual` — наследники могут переопределить его для специфического поведения смерти.
-- Метод `Attack()` тоже `virtual` — наследники могут реализовать свою логику атаки (ближний/дальний бой).
-- В `Update()` реализована простая логика ИИ: поиск цели → движение → атака.
+- Мы разделили ответственность:
+  - `EnemyStats` отвечает за статы и здоровье;
+  - `EnemyBase` — за поиск цели, движение и атаку.
+- `EnemyBase` не знает про `EnemyData` напрямую, он работает только через `EnemyStats`.
+- Такой подход облегчает дальнейшее развитие (например, добавление бафов/дебафов в `EnemyStats` или наследников `EnemyBase` с разным поведением).
 
 ---
 
-## 5. Как EnemyBase будет использоваться дальше
+## 5. Как EnemyBase и EnemyStats будут использоваться дальше
 
 На следующих уроках:
 
 - `EnemyFactory` будет:
   - создавать экземпляр префаба врага;
-  - назначать `EnemyData` в компонент `EnemyBase`;
-  - возвращать созданный объект.
+  - назначать `EnemyData` в компонент `EnemyStats` и вызывать его инициализацию;
+  - проверять наличие `EnemyBase` и связывать его с `EnemyStats`;
+  - возвращать созданный объект типа `EnemyBase`.
 - `EnemySpawner` будет:
   - использовать `EnemyFactory` для создания врагов;
-  - работать с типом `EnemyBase`, не зная конкретного типа врага.
+  - работать с типом `EnemyBase`, не зная конкретного типа врага и не залезая в его статы.
 - На Этапе 8 (IDamageable):
-  - `EnemyBase.TakeDamage()` будет вызываться из системы урона игрока;
-  - `EnemyBase.Attack()` будет наносить урон игроку через `IDamageable`.
+  - входящий урон по врагу будет обрабатываться в `EnemyStats.TakeDamage()` (через интерфейс IDamageable или вызовы из других систем);
+  - `EnemyBase.Attack()` будет брать величину урона из `stats.Damage` и наносить его игроку через IDamageable.
 - На Этапе 9 (ИИ врагов):
-  - можно будет расширить логику поиска цели и движения;
-  - можно будет добавить состояния (патрулирование, преследование, атака).
+  - можно будет расширить логику поиска цели и движения в `EnemyBase`;
+  - можно будет добавлять различные состояния (патрулирование, преследование, атака) поверх существующего каркаса.
 
 ---
 
@@ -338,14 +400,33 @@ public class EnemyBase : MonoBehaviour
 
 Ответь на вопросы:
 
-1. Почему `EnemyBase` не сделан абстрактным, в отличие от `WeaponBase`?
-2. Какие методы помечены как `virtual` и зачем?
-3. Как `EnemyBase` использует `EnemyData` для получения параметров?
+1. За что отвечают `EnemyStats` и за что — `EnemyBase`?
+2. Почему выгодно хранить статы и текущее здоровье отдельно от логики движения/атаки?
+3. Как `EnemyBase` получает доступ к числам из `EnemyData` (через какой компонент)?
 
 Проверь код:
 
-- `EnemyBase` находится в папке `Assets/_Scripts/Enemies/`.
-- Класс наследуется от `MonoBehaviour`.
-- Методы `Die()` и `Attack()` помечены как `virtual`.
+- `EnemyStats` и `EnemyBase` находятся в папке `Assets/_Scripts/Enemies/`.
+- Оба класса наследуются от `MonoBehaviour`.
+- Логика получения урона и смерти реализована в `EnemyStats`, а поиск цели/движение/атака — в `EnemyBase`.
 
 Если всё это выполнено и понятно — можно переходить к уроку 7.3 (`EnemyFactory` — паттерн Factory для создания врагов).
+
+---
+
+## 7. Альтернативные реализации для других типов игр
+
+В этом уроке мы пишем `EnemyStats` и `EnemyBase` для **3D‑игры от третьего лица**, но та же идея разделения статов и поведения работает и в других форматах:
+
+- **2D‑игра (вид сбоку или top‑down):**
+  - Вместо `Physics.OverlapSphere` можно использовать 2D‑физику (`Physics2D.OverlapCircle`) и компоненты `Rigidbody2D`/`Collider2D`.
+  - При движении к цели игнорировать ось `Z` и работать только с `X`/`Y`.
+  - В остальном структура та же: ScriptableObject `EnemyData` + компонент статов (`EnemyStats`) + компонент поведения (`EnemyBase`).
+- **Шутер от первого лица:**
+  - Целью может быть не только объект игрока, но и его камера (`Camera.main.transform`), чтобы враг смотрел именно туда, где «глаза» игрока.
+  - Можно добавить Raycast из врага к игроку, чтобы атаковать только при **прямой видимости** (нет стен/препятствий между ними).
+- **Другие жанры (симуляторы, стратегии, tower defense):**
+  - Пара `EnemyStats` + `EnemyBase` превращается в базовый набор компонентов «юнита»/«агента»: отдельный компонент для статов и отдельный — для поведения.
+  - Логика поиска цели и движения может быть другой (по пути, по точкам интереса, по ближайшей башне), но принципы разделения ответственности и наследования остаются теми же.
+
+Задача этого урока — показать универсальный каркас врага, который можно адаптировать под любой формат игры, не переписывая всё с нуля.

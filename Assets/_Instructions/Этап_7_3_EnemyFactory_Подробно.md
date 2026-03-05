@@ -26,10 +26,11 @@
 
 1. Принимать `EnemyData` как параметр.
 2. Создавать экземпляр префаба из `EnemyData.prefab`.
-3. Настраивать компонент `EnemyBase` на созданном объекте:
+3. Настраивать компонент `EnemyStats` на созданном объекте:
    - назначать `EnemyData`;
-   - инициализировать здоровье и другие параметры.
-4. Возвращать созданный объект типа `EnemyBase`.
+   - инициализировать здоровье и другие статы.
+4. Убеждаться, что на объекте есть `EnemyBase` и он ссылается на `EnemyStats`.
+5. Возвращать созданный объект типа `EnemyBase`.
 
 **Преимущества:**
 
@@ -67,7 +68,7 @@
 
 1. Уроки 7.1 и 7.2 выполнены:
    - есть класс `EnemyData` и несколько ассетов;
-   - есть класс `EnemyBase` и префаб врага с этим компонентом.
+   - есть классы `EnemyStats` и `EnemyBase` и префаб врага как минимум с этими двумя компонентами (или фабрика добавит их сама).
 2. Префаб врага назначен в `EnemyData.prefab` (хотя бы для одного ассета).
 
 ---
@@ -79,7 +80,7 @@
 `EnemyFactory` должна:
 
 - Создавать врага из `EnemyData`.
-- Настраивать компонент `EnemyBase` на созданном объекте.
+- Настраивать компоненты `EnemyStats` и `EnemyBase` на созданном объекте.
 - Возвращать готовый к использованию объект.
 - Обрабатывать ошибки (отсутствие данных, префаба и т.п.).
 
@@ -107,27 +108,19 @@
 
 ### 4.2. Реализация EnemyFactory
 
-Замените содержимое файла на следующий код:
+Замените содержимое файла на следующий код (пример реализации под разделённые `EnemyStats` и `EnemyBase`):
 
 ```csharp
 using UnityEngine;
 
 /// <summary>
 /// Фабрика для создания врагов на основе EnemyData.
-/// Использует паттерн Factory для централизации логики создания.
+/// Настраивает EnemyStats и EnemyBase и скрывает детали создания.
 /// </summary>
 public static class EnemyFactory
 {
-    /// <summary>
-    /// Создаёт врага на основе EnemyData в указанной позиции и повороте.
-    /// </summary>
-    /// <param name="data">Данные врага (EnemyData).</param>
-    /// <param name="position">Позиция создания.</param>
-    /// <param name="rotation">Поворот врага.</param>
-    /// <returns>Созданный враг (EnemyBase) или null, если создание не удалось.</returns>
     public static EnemyBase CreateEnemy(EnemyData data, Vector3 position, Quaternion rotation)
     {
-        // Проверка входных данных
         if (data == null)
         {
             Debug.LogError("EnemyFactory.CreateEnemy: EnemyData не может быть null!");
@@ -143,39 +136,43 @@ public static class EnemyFactory
         // Создаём экземпляр префаба
         GameObject enemyObject = Object.Instantiate(data.prefab, position, rotation);
 
-        // Получаем или добавляем компонент EnemyBase
+        // Гарантируем наличие EnemyStats
+        EnemyStats stats = enemyObject.GetComponent<EnemyStats>();
+        if (stats == null)
+        {
+            Debug.LogWarning($"EnemyFactory.CreateEnemy: у префаба {data.prefab.name} нет EnemyStats. Добавляю...");
+            stats = enemyObject.AddComponent<EnemyStats>();
+        }
+
+        stats.enemyData = data;
+        stats.InitializeFromData();
+
+        // Гарантируем наличие EnemyBase
         EnemyBase enemy = enemyObject.GetComponent<EnemyBase>();
         if (enemy == null)
         {
-            Debug.LogWarning($"EnemyFactory.CreateEnemy: у префаба {data.prefab.name} нет компонента EnemyBase. Добавляю...");
+            Debug.LogWarning($"EnemyFactory.CreateEnemy: у префаба {data.prefab.name} нет EnemyBase. Добавляю...");
             enemy = enemyObject.AddComponent<EnemyBase>();
         }
 
-        // Настраиваем компонент EnemyBase
-        enemy.enemyData = data;
-
-        // Инициализируем здоровье (это сделает Awake в EnemyBase, но можно и здесь)
-        // enemy.currentHealth будет установлен в Awake() компонента EnemyBase
+        if (enemy.stats == null)
+        {
+            enemy.stats = stats;
+        }
 
         Debug.Log($"EnemyFactory: создан враг {data.enemyName} в позиции {position}");
 
         return enemy;
     }
 
-    /// <summary>
-    /// Создаёт врага в указанной позиции с поворотом по умолчанию.
-    /// </summary>
     public static EnemyBase CreateEnemy(EnemyData data, Vector3 position)
     {
         return CreateEnemy(data, position, Quaternion.identity);
     }
 
-    /// <summary>
-    /// Создаёт врага в позиции (0, 0, 0) с поворотом по умолчанию.
-    /// </summary>
     public static EnemyBase CreateEnemy(EnemyData data)
     {
-        return CreateEnemy(data, Vector3.zero);
+        return CreateEnemy(data, Vector3.zero, Quaternion.identity);
     }
 }
 ```
@@ -184,10 +181,11 @@ public static class EnemyFactory
 
 - Класс помечен как `static` — не нужен экземпляр, все методы статические.
 - Метод `CreateEnemy` проверяет входные данные перед созданием.
-- После создания префаба мы настраиваем компонент `EnemyBase`:
+- После создания префаба мы настраиваем **EnemyStats**:
   - назначаем `enemyData`;
-  - компонент сам инициализирует здоровье в `Awake()`.
-- Возвращаем `EnemyBase`, а не `GameObject` — это позволяет работать с врагом через единый интерфейс.
+  - инициализируем здоровье и другие статы.
+- Затем убеждаемся, что есть **EnemyBase**, и связываем его с `EnemyStats`.
+- Возвращаем `EnemyBase`, а не `GameObject` — это позволяет работать с врагом через единый интерфейс поведения.
 
 ---
 
@@ -202,11 +200,25 @@ public static class EnemyFactory
 В будущем:
 
 - На Этапе 10 (Object Pool):
-  - `EnemyFactory` можно будет модифицировать для использования пула объектов вместо `Instantiate`.
+  - `EnemyFactory` можно будет модифицировать для использования пула объектов вместо `Instantiate`, оставив интерфейс `CreateEnemy` прежним.
 - В других системах:
   - квесты могут создавать врагов через фабрику;
   - события могут спавнить врагов через фабрику;
-  - все используют единый интерфейс создания.
+  - все используют единый интерфейс создания и не знают, как именно настраиваются `EnemyStats` и `EnemyBase`.
+
+### 5.1. Где ещё можно использовать Factory
+
+Паттерн Factory полезен не только для врагов. Те же идеи можно применять и в других частях игры:
+
+- **Оружие и снаряды:** фабрика может создавать разные типы снарядов (`Projectile`) или оружия на основе данных (`WeaponData`), добавляя нужные компоненты и настраивая урон/скорость.  
+- **Предметы и лут:** фабрика для предметов инвентаря (`ItemBase`) — создание объекта по `ItemData` и настройка внешнего вида/иконки/логики использования.  
+- **NPC и окна UI:** фабрика может создавать NPC определённого типа или окна интерфейса (меню, диалог, всплывающие подсказки) по данным, не разбрызгивая `Instantiate` по всему коду.  
+- **Боссы и особые существа:** вместо прямого `Instantiate` в квестах/сценариях можно всегда вызывать `BossFactory.CreateBoss(data, position)`, чтобы всё специальное поведение и инициализация были собраны в одном месте.
+
+С точки зрения SOLID:
+
+- **SRP:** фабрика отвечает только за создание объектов, а не за их поведение.  
+- **OCP:** можно добавлять новые типы врагов, снарядов, предметов и UI, меняя только фабрику и данные, а код, который вызывает Factory, остаётся прежним.
 
 ---
 
@@ -256,6 +268,6 @@ public class EnemyFactoryTest : MonoBehaviour
 
 - `EnemyFactory` находится в папке `Assets/_Scripts/Enemies/`.
 - Класс помечен как `static`.
-- Метод `CreateEnemy` проверяет входные данные и настраивает компонент `EnemyBase`.
+- Метод `CreateEnemy` проверяет входные данные и настраивает компоненты `EnemyStats` и `EnemyBase`.
 
 Если всё это выполнено и понятно — можно переходить к уроку 7.4 (`EnemySpawner` — спавнер врагов).
