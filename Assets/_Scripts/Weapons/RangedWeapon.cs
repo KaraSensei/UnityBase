@@ -11,10 +11,6 @@ public class RangedWeapon : WeaponBase
     [SerializeField]
     private Transform shootOrigin;
 
-    [Tooltip("Скорость снаряда. Если 0, используется значение по умолчанию в префабе.")]
-    [SerializeField]
-    private float projectileSpeedOverride = 0f;
-
     [Tooltip("Слои, по которым может быть нанесён урон.")]
     [SerializeField]
     private LayerMask projectileHitLayers;
@@ -57,15 +53,7 @@ public class RangedWeapon : WeaponBase
         Projectile projectile = projectileObject.GetComponent<Projectile>();
         if (projectile != null)
         {
-            // Настраиваем снаряд через публичные свойства, а не прямой доступ к полям.
-            projectile.Damage = Damage;
-            projectile.MaxDistance = Range;
-            projectile.HitLayers = projectileHitLayers;
-
-            if (projectileSpeedOverride > 0f)
-            {
-                projectile.Speed = projectileSpeedOverride;
-            }
+            projectile.Setup(Damage, Range, WeaponData.projectileSpeed, projectileHitLayers);
         }
 
         Debug.Log($"{name}: дальняя атака, выпущен снаряд с уроном {Damage} и дальностью {Range}.");
