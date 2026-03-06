@@ -22,32 +22,15 @@ public class Projectile : MonoBehaviour
     [SerializeField]
     private LayerMask hitLayers;
 
-    /// <summary>Скорость полёта снаряда.</summary>
-    public float Speed
+    /// <summary>
+    /// Настраивает снаряд перед полётом. Вызывается оружием при создании снаряда.
+    /// </summary>
+    public void Setup(float damage, float maxDistance, float speed, LayerMask hitLayers)
     {
-        get => speed;
-        set => speed = value;
-    }
-
-    /// <summary>Максимальная дистанция полёта.</summary>
-    public float MaxDistance
-    {
-        get => maxDistance;
-        set => maxDistance = value;
-    }
-
-    /// <summary>Урон снаряда.</summary>
-    public float Damage
-    {
-        get => damage;
-        set => damage = value;
-    }
-
-    /// <summary>Маска слоёв, по которым снаряд может наносить урон.</summary>
-    public LayerMask HitLayers
-    {
-        get => hitLayers;
-        set => hitLayers = value;
+        this.damage = damage;
+        this.maxDistance = maxDistance;
+        this.speed = speed;
+        this.hitLayers = hitLayers;
     }
 
     private Vector3 _startPosition;
