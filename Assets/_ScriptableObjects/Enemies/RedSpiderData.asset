@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 66c9a44288b01d44da77b58534d1c253, type: 3}
-  m_Name: GoblinData
+  m_Name: RedSpiderData
   m_EditorClassIdentifier: 
-  enemyName: Goblin
+  enemyName: RedSpider
   enemyType: 0
-  maxHealth: 50
-  moveSpeed: 3
-  damage: 5
+  maxHealth: 80
+  moveSpeed: 2
+  damage: 8
   attackRange: 2
-  detectionRange: 10
-  experienceReward: 10
-  prefab: {fileID: 0}
+  detectionRange: 15
+  experienceReward: 20
+  prefab: {fileID: 835341589936999249, guid: 7669348b23c156040867c5ce0900a6d0, type: 3}
