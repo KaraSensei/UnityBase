@@ -31,20 +31,16 @@
 
 1. При старте (или по сигналу) начинается цикл спавна.
 2. Каждые N секунд (`spawnInterval`):
-   - проверяем, не превышен ли лимит врагов (`maxEnemies`);
+   - проверяем лимиты врагов (для каждого типа отдельно);
    - выбираем случайную точку спавна;
-   - выбираем случайный тип врага из списка;
+   - выбираем, какого врага спавнить (обычного или усиленного);
    - вызываем `EnemyFactory.CreateEnemy()`.
 3. Можно остановить спавн в любой момент.
 
-### 0.3. Расширения в будущем
+### 0.3. Важно: мы используем Object Pool
 
-На следующих этапах можно добавить:
-
-- **Волны врагов** — разные типы и количества в зависимости от волны.
-- **Спавн по событиям** — создание врагов при определённых условиях.
-- **Зоны спавна** — враги появляются только в определённых областях.
-- **Интеграция с Object Pool** (Этап 10) — переиспользование объектов вместо создания новых.
+В этом проекте враги **не уничтожаются** через `Destroy`, а **возвращаются в пул** (см. уроки 7.2–7.3).
+Поэтому спавнер должен считать активных врагов не по `null`, а по тому, активен ли объект в сцене (`activeInHierarchy`).
 
 ---
 
@@ -91,9 +87,11 @@
 **Поля:**
 
 - `Transform[] spawnPoints` — точки спавна.
-- `EnemyData[] enemyDataList` — список типов врагов для спавна.
+- `EnemyData normalEnemyData` — данные обычного врага (мили).
+- `EnemyData strongEnemyData` — данные более сильного врага (тоже мили).
 - `float spawnInterval` — интервал между спавнами (в секундах).
-- `int maxEnemies` — максимальное количество врагов одновременно.
+- `int maxNormalEnemies` — лимит обычных врагов.
+- `int maxStrongEnemies` — лимит сильных врагов.
 - `bool spawnOnStart` — спавнить ли при старте.
 - `bool isSpawning` — флаг активного спавна.
 
@@ -130,22 +128,37 @@ using UnityEngine;
 /// </summary>
 public class EnemySpawner : MonoBehaviour
 {
+    [Header("Пул")]
+    [Tooltip("Ссылка на EnemyPool, который лежит на сцене.")]
+    public EnemyPool pool;
+
+    [Header("Опыт за убийство")]
+    [Tooltip("Компонент, который слушает смерть врагов и даёт опыт игроку.")]
+    public EnemyDeathRewarder deathRewarder;
+
     [Header("Точки спавна")]
     [Tooltip("Массив точек, где могут появляться враги.")]
     public Transform[] spawnPoints;
 
-    [Header("Типы врагов")]
-    [Tooltip("Список типов врагов, которые могут быть созданы.")]
-    public EnemyData[] enemyDataList;
+    [Header("Типы врагов (оба мили)")]
+    [Tooltip("Данные обычного врага.")]
+    public EnemyData normalEnemyData;
+
+    [Tooltip("Данные сильного врага (медленнее, но сильнее).")]
+    public EnemyData strongEnemyData;
 
     [Header("Настройки спавна")]
     [Min(0.1f)]
     [Tooltip("Интервал между спавнами (в секундах).")]
     public float spawnInterval = 5f;
 
-    [Min(1)]
-    [Tooltip("Максимальное количество врагов одновременно на сцене.")]
-    public int maxEnemies = 10;
+    [Min(0)]
+    [Tooltip("Максимум обычных врагов одновременно на сцене.")]
+    public int maxNormalEnemies = 10;
+
+    [Min(0)]
+    [Tooltip("Максимум сильных врагов одновременно на сцене.")]
+    public int maxStrongEnemies = 5;
 
     [Tooltip("Начинать ли спавн автоматически при старте.")]
     public bool spawnOnStart = true;
@@ -156,21 +169,40 @@ public class EnemySpawner : MonoBehaviour
 
     private bool isSpawning = false;
     private Coroutine spawnCoroutine;
-    private List<EnemyBase> spawnedEnemies = new List<EnemyBase>();
+    // Отдельно храним врагов по типам, чтобы удобно проверять лимиты.
+    private List<EnemyBase> activeNormalEnemies = new List<EnemyBase>();
+    private List<EnemyBase> activeStrongEnemies = new List<EnemyBase>();
 
     private void Start()
     {
         // Валидация данных
+        if (pool == null)
+        {
+            Debug.LogWarning($"{name}: EnemyPool не назначен! Спавн не будет работать.");
+            return;
+        }
+
         if (spawnPoints == null || spawnPoints.Length == 0)
         {
             Debug.LogWarning($"{name}: нет точек спавна! Спавн не будет работать.");
             return;
         }
 
-        if (enemyDataList == null || enemyDataList.Length == 0)
+        if (normalEnemyData == null && strongEnemyData == null)
         {
             Debug.LogWarning($"{name}: нет типов врагов для спавна! Спавн не будет работать.");
             return;
+        }
+
+        // Прогреваем пул заранее.
+        // Это значит: создаём нужное количество врагов заранее и держим их выключенными.
+        if (normalEnemyData != null && normalEnemyData.prefab != null)
+        {
+            pool.Warmup(normalEnemyData.prefab, maxNormalEnemies);
+        }
+        if (strongEnemyData != null && strongEnemyData.prefab != null)
+        {
+            pool.Warmup(strongEnemyData.prefab, maxStrongEnemies);
         }
 
         // Запуск спавна при старте, если включено
@@ -231,20 +263,22 @@ public class EnemySpawner : MonoBehaviour
         {
             yield return new WaitForSeconds(spawnInterval);
 
-            // Проверяем количество врагов
-            CleanupDestroyedEnemies();
-            if (spawnedEnemies.Count >= maxEnemies)
-            {
-                if (showDebugLogs)
-                    Debug.Log($"{name}: достигнут лимит врагов ({maxEnemies}). Пропускаем спавн.");
-                continue;
-            }
+            // Чистим списки от выключенных (возвращённых в пул) объектов.
+            CleanupInactiveEnemies();
 
             // Создаём врага
             EnemyBase enemy = SpawnEnemy();
             if (enemy != null)
             {
-                spawnedEnemies.Add(enemy);
+                // Добавляем в нужный список по типу.
+                if (enemy.GetComponent<EnemyStats>() != null && enemy.GetComponent<EnemyStats>().EnemyData == normalEnemyData)
+                {
+                    activeNormalEnemies.Add(enemy);
+                }
+                else
+                {
+                    activeStrongEnemies.Add(enemy);
+                }
             }
         }
     }
@@ -263,17 +297,44 @@ public class EnemySpawner : MonoBehaviour
 
         Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
 
-        // Выбираем случайный тип врага
-        if (enemyDataList.Length == 0)
+        // Сначала чистим списки, чтобы лимиты считались правильно.
+        CleanupInactiveEnemies();
+
+        // Проверяем лимиты по каждому типу.
+        bool canSpawnNormal = normalEnemyData != null && activeNormalEnemies.Count < maxNormalEnemies;
+        bool canSpawnStrong = strongEnemyData != null && activeStrongEnemies.Count < maxStrongEnemies;
+
+        if (!canSpawnNormal && !canSpawnStrong)
         {
-            Debug.LogError($"{name}: нет типов врагов!");
+            if (showDebugLogs)
+                Debug.Log($"{name}: достигнуты лимиты врагов. Пропускаем спавн.");
             return null;
         }
 
-        EnemyData enemyData = enemyDataList[Random.Range(0, enemyDataList.Length)];
+        // Выбираем, кого спавнить.
+        // Простой вариант: если доступны оба — выбираем случайно.
+        EnemyData enemyData;
+        if (canSpawnNormal && canSpawnStrong)
+        {
+            enemyData = Random.value < 0.7f ? normalEnemyData : strongEnemyData; // 70% обычных, 30% сильных
+        }
+        else
+        {
+            enemyData = canSpawnNormal ? normalEnemyData : strongEnemyData;
+        }
 
         // Создаём врага через фабрику
-        EnemyBase enemy = EnemyFactory.CreateEnemy(enemyData, spawnPoint.position, spawnPoint.rotation);
+        EnemyBase enemy = EnemyFactory.CreateEnemy(pool, enemyData, spawnPoint.position, spawnPoint.rotation);
+
+        // Регистрируем врага в системе наград за смерть (опыт игроку).
+        if (enemy != null && deathRewarder != null)
+        {
+            EnemyStats stats = enemy.GetComponent<EnemyStats>();
+            if (stats != null)
+            {
+                deathRewarder.RegisterEnemy(stats);
+            }
+        }
 
         if (enemy != null && showDebugLogs)
         {
@@ -284,11 +345,13 @@ public class EnemySpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// Очищает список врагов от уничтоженных объектов.
+    /// Очищает списки от выключенных (неактивных) объектов.
+    /// В пуле враги обычно не Destroy, а SetActive(false).
     /// </summary>
-    private void CleanupDestroyedEnemies()
+    private void CleanupInactiveEnemies()
     {
-        spawnedEnemies.RemoveAll(enemy => enemy == null || enemy.gameObject == null);
+        activeNormalEnemies.RemoveAll(enemy => enemy == null || !enemy.gameObject.activeInHierarchy);
+        activeStrongEnemies.RemoveAll(enemy => enemy == null || !enemy.gameObject.activeInHierarchy);
     }
 
     /// <summary>
@@ -296,8 +359,8 @@ public class EnemySpawner : MonoBehaviour
     /// </summary>
     public int GetCurrentEnemyCount()
     {
-        CleanupDestroyedEnemies();
-        return spawnedEnemies.Count;
+        CleanupInactiveEnemies();
+        return activeNormalEnemies.Count + activeStrongEnemies.Count;
     }
 
     private void OnDestroy()
@@ -328,8 +391,8 @@ public class EnemySpawner : MonoBehaviour
 Разбор ключевых моментов:
 
 - Используется **корутина** (`IEnumerator SpawnCoroutine()`) для периодического спавна без блокировки основного потока.
-- Список `spawnedEnemies` отслеживает созданных врагов для контроля лимита.
-- Метод `CleanupDestroyedEnemies()` удаляет из списка уничтоженных врагов.
+- Мы ведём два списка активных врагов: обычные и сильные, чтобы проверять лимиты (10 и 5).
+- Метод `CleanupInactiveEnemies()` удаляет из списков выключенных врагов (в пуле враги обычно выключаются, а не уничтожаются).
 - В `OnDrawGizmosSelected()` визуализируются точки спавна в редакторе.
 
 ### 4.3. Новые конструкции этого урока
@@ -339,11 +402,80 @@ public class EnemySpawner : MonoBehaviour
 - **Корутины (`IEnumerator`, `StartCoroutine`, `yield return`)** — позволяют выполнять действия с паузами, не останавливая игру.  
   - Метод `SpawnCoroutine` возвращает `IEnumerator`, а строка `yield return new WaitForSeconds(spawnInterval);` говорит: «подождать N секунд и потом продолжить цикл».
 - **Списки (`List<EnemyBase>`)** — коллекция, в которой можно динамически добавлять и удалять элементы.  
-  - Мы добавляем каждого созданного врага в `spawnedEnemies`, а метод `CleanupDestroyedEnemies()` с помощью `RemoveAll` удаляет из списка все объекты, которые уже уничтожены.
+  - Мы добавляем созданных врагов в `activeNormalEnemies` или `activeStrongEnemies`.
+  - Метод `CleanupInactiveEnemies()` удаляет из списков тех, кто уже выключен (`activeInHierarchy == false`).
 - **`Random.Range`** — выбор случайного числа в диапазоне.  
-  - Вызов `Random.Range(0, spawnPoints.Length)` выбирает случайный индекс точки спавна из массива, а `Random.Range(0, enemyDataList.Length)` — случайный тип врага.
+  - Вызов `Random.Range(0, spawnPoints.Length)` выбирает случайную точку спавна.
+  - Для выбора типа врага мы используем `Random.value < 0.7f` (пример: 70% обычных, 30% сильных).
 - **`OnDrawGizmosSelected` и `Gizmos`** — специальные методы/класс для отрисовки вспомогательной графики **только в редакторе**.  
   - Здесь мы рисуем зелёные сферы и линии, чтобы в Scene View было видно, где находятся точки спавна.
+
+---
+
+### 4.4. EnemyDeathRewarder — выдаём опыт за убийство врага
+
+Чтобы связать смерть врага с опытом игрока, создадим простой компонент‑“слушатель”.
+
+1. В папке `Assets/_Scripts/Enemies/` создай скрипт `EnemyDeathRewarder`.
+2. Замени содержимое на такой код:
+
+```csharp
+using UnityEngine;
+
+/// <summary>
+/// Слушает смерть врагов (EnemyStats.OnDied)
+/// и передаёт опыт в PlayerProgression.
+/// </summary>
+public class EnemyDeathRewarder : MonoBehaviour
+{
+    [Header("Ссылки")]
+    [Tooltip("Компонент прогрессии игрока, куда будем добавлять опыт.")]
+    public PlayerProgression playerProgression;
+
+    /// <summary>
+    /// Регистрирует врага: подписывается на его событие смерти.
+    /// </summary>
+    public void RegisterEnemy(EnemyStats stats)
+    {
+        if (stats == null)
+            return;
+
+        // Подписываемся на событие смерти конкретного врага.
+        stats.OnDied += HandleEnemyDied;
+    }
+
+    /// <summary>
+    /// Обработчик смерти врага.
+    /// Отдаёт игроку опыт за этого врага.
+    /// </summary>
+    private void HandleEnemyDied(EnemyStats stats)
+    {
+        if (stats == null)
+            return;
+
+        // Очень важно отписаться, чтобы не копить "лишние" подписки.
+        stats.OnDied -= HandleEnemyDied;
+
+        if (playerProgression == null)
+        {
+            Debug.LogWarning("EnemyDeathRewarder: PlayerProgression не назначен.", this);
+            return;
+        }
+
+        float reward = stats.ExperienceReward;
+        if (reward > 0f)
+        {
+            // Добавляем опыт игроку.
+            playerProgression.AddExperience(reward);
+        }
+    }
+}
+```
+
+Этот класс делает только одну вещь:
+
+- слушает событие `EnemyStats.OnDied`;
+- один раз добавляет опыт игроку через `PlayerProgression.AddExperience`.
 
 ---
 
@@ -359,10 +491,14 @@ public class EnemySpawner : MonoBehaviour
 1. В сцене создай пустой объект, назови его `EnemySpawner`.
 2. Добавь на него компонент `EnemySpawner`.
 3. В Inspector настрои:
+   - `Pool` → перетащи объект с компонентом `EnemyPool`.
+   - `Death Rewarder` → перетащи объект с компонентом `EnemyDeathRewarder`.
    - `Spawn Points` → добавь все созданные точки спавна в массив.
-   - `Enemy Data List` → добавь ассеты `EnemyData` (Goblin, Orc, Archer).
+   - `Normal Enemy Data` → ассет обычного врага (лимит 10).
+   - `Strong Enemy Data` → ассет сильного врага (лимит 5).
    - `Spawn Interval` → `5` секунд.
-   - `Max Enemies` → `10`.
+   - `Max Normal Enemies` → `10`.
+   - `Max Strong Enemies` → `5`.
    - `Spawn On Start` → `true`.
    - `Show Debug Logs` → `true` (для отладки).
 
@@ -380,7 +516,7 @@ public class EnemySpawner : MonoBehaviour
    - каждые 5 секунд должны появляться враги в случайных точках спавна;
    - в консоли должны быть логи о создании врагов;
    - враги должны двигаться к игроку (если он в радиусе обнаружения);
-   - после достижения лимита (`maxEnemies`) спавн должен приостановиться до смерти части врагов.
+   - после достижения лимитов (10 обычных и 5 сильных) спавн должен приостановиться до "смерти" (возврата в пул) части врагов.
 
 ---
 
@@ -395,8 +531,6 @@ public class EnemySpawner : MonoBehaviour
   - создание врагов при определённых условиях (вход в комнату, активация триггера).
 - **Зоны спавна:**
   - враги появляются только в определённых областях.
-- **Интеграция с Object Pool** (Этап 10):
-  - переиспользование объектов вместо создания новых.
 
 ---
 
@@ -405,13 +539,13 @@ public class EnemySpawner : MonoBehaviour
 Ответь на вопросы:
 
 1. Почему используется корутина вместо `Update()` для периодического спавна?
-2. Зачем нужен список `spawnedEnemies` и метод `CleanupDestroyedEnemies()`?
+2. Зачем нужны списки активных врагов и метод `CleanupInactiveEnemies()`?
 3. Как `EnemySpawner` использует `EnemyFactory` для создания врагов?
 
 Проверь в проекте:
 
 - `EnemySpawner` находится в папке `Assets/_Scripts/Enemies/`.
-- В сцене есть объект `EnemySpawner` с настроенными точками спавна и списком `EnemyData`.
+- В сцене есть объект `EnemySpawner` с настроенными точками спавна, двумя `EnemyData`, ссылкой на `EnemyPool` и `EnemyDeathRewarder`.
 - При запуске игры враги появляются периодически.
 
 Если всё это выполнено и понятно — Этап 7 («Враги и Factory») можно считать завершённым. Далее — переход к Этапу 8 (общий интерфейс IDamageable для игрока и врагов).

@@ -114,17 +114,21 @@
 Из этого следует структура:
 
 - Компонент `EnemyStats`:
-  - поле `EnemyData enemyData`;
+  - поле `EnemyData enemyData` (назначается в инспекторе или через фабрику);
   - приватное поле `currentHealth`;
   - свойства `MaxHealth`, `MoveSpeed`, `Damage`, `AttackRange`, `DetectionRange`, `ExperienceReward`;
   - методы:
-    - `InitializeFromData()` — установка текущего здоровья по данным;
+    - `Setup(EnemyData data)` — назначение данных и инициализация;
+    - `InitializeFromData()` — установка текущего здоровья по данным (используется внутри `Setup`);
     - `TakeDamage(float damage)` — получение урона и проверка смерти;
     - `Die()` — базовая логика смерти врага.
 - Компонент `EnemyBase`:
   - ссылка на `EnemyStats stats`;
   - поле `Transform target` — текущая цель (обычно игрок);
   - поля `LayerMask playerLayer` и `string playerTag` для поиска цели;
+  - простые тайминги:
+    - `targetSearchInterval` — как часто искать цель;
+    - `attackCooldown` — пауза между атаками;
   - методы:
     - `FindTarget()` — поиск цели в радиусе обнаружения, используя `stats.DetectionRange`;
     - `MoveTowardsTarget()` — движение к цели с использованием `stats.MoveSpeed`;
@@ -146,7 +150,16 @@
 
 Скрипт `EnemyStats` отвечает за связь с `EnemyData` и текущее состояние врага. Пример итогового кода (набирай сам, понимая каждую строку):
 
+Почему мы делаем инициализацию именно так:
+
+- `EnemyData` — это **конфиг** (числа “по умолчанию”), а `currentHealth` — **состояние конкретного экземпляра** врага в сцене.
+- Мы инициализируем `currentHealth` из `EnemyData`, чтобы у каждого созданного врага было корректное стартовое здоровье.
+- В Unity есть нюанс порядка вызовов: `Awake()` вызывается сразу после `Instantiate`, а фабрика часто назначает `EnemyData` уже после создания объекта.
+  Поэтому у нас есть единая точка инициализации `Setup(data)` — её вызывает фабрика.
+  А `Awake()` инициализирует только тот случай, когда данные назначены прямо в инспекторе (для простых тестов/ручной настройки префаба).
+
 ```csharp
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -157,12 +170,13 @@ public class EnemyStats : MonoBehaviour
 {
     [Header("Данные врага")]
     [Tooltip("ScriptableObject с базовыми параметрами врага.")]
-    public EnemyData enemyData;
+    [SerializeField] private EnemyData enemyData;
 
     [Header("Состояние")]
     [Tooltip("Текущее здоровье врага.")]
     [SerializeField] private float currentHealth;
 
+    public EnemyData EnemyData => enemyData;
     public float MaxHealth => enemyData != null ? enemyData.maxHealth : 0f;
     public float MoveSpeed => enemyData != null ? enemyData.moveSpeed : 0f;
     public float Damage => enemyData != null ? enemyData.damage : 0f;
@@ -170,8 +184,29 @@ public class EnemyStats : MonoBehaviour
     public float DetectionRange => enemyData != null ? enemyData.detectionRange : 0f;
     public float ExperienceReward => enemyData != null ? enemyData.experienceReward : 0f;
 
+    /// <summary>
+    /// Событие "враг умер".
+    /// На него будут подписываться другие системы: пул врагов, система опыта и т.д.
+    /// </summary>
+    public event Action<EnemyStats> OnDied;
+
     private void Awake()
     {
+        // Awake вызывается сразу после создания объекта.
+        // Если данные назначены в инспекторе — можно инициализировать состояние сразу.
+        // Если враг создаётся фабрикой, она вызовет Setup(data) после назначения EnemyData.
+        if (enemyData != null)
+        {
+            InitializeFromData();
+        }
+    }
+
+    /// <summary>
+    /// Единая точка инициализации для врагов, созданных через фабрику.
+    /// </summary>
+    public void Setup(EnemyData data)
+    {
+        enemyData = data;
         InitializeFromData();
     }
 
@@ -180,6 +215,7 @@ public class EnemyStats : MonoBehaviour
     /// </summary>
     public void InitializeFromData()
     {
+        // EnemyData — конфиг, currentHealth — runtime-состояние экземпляра.
         if (enemyData != null)
         {
             currentHealth = enemyData.maxHealth;
@@ -214,12 +250,10 @@ public class EnemyStats : MonoBehaviour
     {
         Debug.Log($"{name}: умер! Награда за убийство: {ExperienceReward} опыта.");
 
-        // Здесь позже можно:
-        // - начислять опыт игроку;
-        // - вызывать события;
-        // - проигрывать анимации/звуки.
-
-        Destroy(gameObject);
+        // Здесь мы только "сообщаем" всем подписчикам, что этот враг умер.
+        // Что именно делать дальше (вернуть в пул, дать опыт игроку и т.п.)
+        // решают другие системы, которые подписались на это событие.
+        OnDied?.Invoke(this);
     }
 }
 ```
@@ -227,6 +261,11 @@ public class EnemyStats : MonoBehaviour
 ### 4.3. Реализация EnemyBase
 
 Скрипт `EnemyBase` отвечает за поведение: поиск цели, движение, атаку. Он не хранит числа напрямую, а использует `EnemyStats`:
+
+Почему в `EnemyBase` есть тайминги:
+
+- Без кулдауна базовая атака будет вызываться каждый кадр, что выглядит неправильно и ломает баланс.
+- Поиск цели через `Physics.OverlapSphere` тоже не стоит делать каждый кадр для каждого врага — поэтому мы ищем цель раз в небольшой интервал.
 
 ```csharp
 using UnityEngine;
@@ -239,21 +278,34 @@ public class EnemyBase : MonoBehaviour
 {
     [Header("Компоненты")]
     [Tooltip("Компонент со статами врага.")]
-    public EnemyStats stats;
+    [SerializeField] private EnemyStats stats;
 
     [Header("Цель")]
     [Tooltip("Текущая цель врага (обычно игрок).")]
-    public Transform target;
+    [SerializeField] private Transform target;
 
     [Header("Настройки поиска цели")]
     [Tooltip("Слой, на котором находится игрок.")]
-    public LayerMask playerLayer;
+    [SerializeField] private LayerMask playerLayer;
 
     [Tooltip("Тег игрока.")]
-    public string playerTag = "Player";
+    [SerializeField] private string playerTag = "Player";
+
+    [Header("Простые тайминги (учебно)")]
+    [Tooltip("Как часто враг пытается искать цель, если цель не найдена.")]
+    [Min(0.05f)]
+    [SerializeField] private float targetSearchInterval = 0.5f;
+
+    [Tooltip("Минимальная пауза между атаками (чтобы не атаковать каждый кадр).")]
+    [Min(0f)]
+    [SerializeField] private float attackCooldown = 1f;
+
+    private float nextTargetSearchTime;
+    private float nextAttackTime;
 
     private void Awake()
     {
+        // Подтягиваем EnemyStats автоматически, чтобы префаб был устойчивым.
         if (stats == null)
         {
             stats = GetComponent<EnemyStats>();
@@ -272,7 +324,12 @@ public class EnemyBase : MonoBehaviour
 
         if (target == null)
         {
-            FindTarget();
+            // Ищем цель не каждый кадр, а по интервалу.
+            if (Time.time >= nextTargetSearchTime)
+            {
+                nextTargetSearchTime = Time.time + targetSearchInterval;
+                FindTarget();
+            }
             return;
         }
 
@@ -286,12 +343,22 @@ public class EnemyBase : MonoBehaviour
 
         if (distanceToTarget <= stats.AttackRange)
         {
-            Attack();
+            TryAttack();
         }
         else
         {
             MoveTowardsTarget();
         }
+    }
+
+    private void TryAttack()
+    {
+        // Кулдаун защищает от атаки "каждый кадр".
+        if (Time.time < nextAttackTime)
+            return;
+
+        nextAttackTime = Time.time + attackCooldown;
+        Attack();
     }
 
     public void FindTarget()
@@ -304,10 +371,9 @@ public class EnemyBase : MonoBehaviour
         if (colliders.Length == 0)
             return;
 
-        target = colliders[0].transform;
-
-        if (!string.IsNullOrEmpty(playerTag) && !target.CompareTag(playerTag))
+        if (!string.IsNullOrEmpty(playerTag))
         {
+            target = null;
             foreach (Collider col in colliders)
             {
                 if (col.CompareTag(playerTag))
@@ -316,6 +382,10 @@ public class EnemyBase : MonoBehaviour
                     break;
                 }
             }
+        }
+        else
+        {
+            target = colliders[0].transform;
         }
 
         if (target != null)
@@ -353,6 +423,12 @@ public class EnemyBase : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
+        // Gizmos рисуются в редакторе, даже если Awake ещё не вызывался.
+        if (stats == null)
+        {
+            stats = GetComponent<EnemyStats>();
+        }
+
         if (stats == null)
             return;
 
@@ -381,7 +457,7 @@ public class EnemyBase : MonoBehaviour
 
 - `EnemyFactory` будет:
   - создавать экземпляр префаба врага;
-  - назначать `EnemyData` в компонент `EnemyStats` и вызывать его инициализацию;
+  - передавать `EnemyData` в компонент `EnemyStats` через `Setup(data)`;
   - проверять наличие `EnemyBase` и связывать его с `EnemyStats`;
   - возвращать созданный объект типа `EnemyBase`.
 - `EnemySpawner` будет:
@@ -409,6 +485,7 @@ public class EnemyBase : MonoBehaviour
 - `EnemyStats` и `EnemyBase` находятся в папке `Assets/_Scripts/Enemies/`.
 - Оба класса наследуются от `MonoBehaviour`.
 - Логика получения урона и смерти реализована в `EnemyStats`, а поиск цели/движение/атака — в `EnemyBase`.
+- `EnemyStats` инициализируется данными врага через `Setup(EnemyData data)`.
 
 Если всё это выполнено и понятно — можно переходить к уроку 7.3 (`EnemyFactory` — паттерн Factory для создания врагов).
 
