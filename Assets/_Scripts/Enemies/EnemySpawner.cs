@@ -1,31 +1,29 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Спавнер врагов: периодически создаёт врагов в точках спавна.
-/// Использует EnemyFactory для создания врагов.
+/// Базовый спавнер врагов для этапа 7:
+/// - работает со списком EnemyData;
+/// - ограничивает общее число активных врагов;
+/// - опционально использует EnemyPool и EnemyDeathRewarder.
 /// </summary>
 public class EnemySpawner : MonoBehaviour
 {
-    [Header("Пул")]
-    [Tooltip("Ссылка на EnemyPool, который лежит на сцене.")]
+    [Header("Опциональные системы")]
+    [Tooltip("Если назначен, враги будут создаваться через пул. Если нет, через Instantiate.")]
     public EnemyPool pool;
 
-    [Header("Опыт за убийство")]
-    [Tooltip("Компонент, который слушает смерть врагов и даёт опыт игроку.")]
+    [Tooltip("Если назначен, спавнер регистрирует врагов для выдачи опыта.")]
     public EnemyDeathRewarder deathRewarder;
 
     [Header("Точки спавна")]
     [Tooltip("Массив точек, где могут появляться враги.")]
     public Transform[] spawnPoints;
 
-    [Header("Типы врагов (оба мили)")]
-    [Tooltip("Данные обычного врага.")]
-    public EnemyData normalEnemyData;
-
-    [Tooltip("Данные сильного врага (медленнее, но сильнее).")]
-    public EnemyData strongEnemyData;
+    [Header("Типы врагов")]
+    [Tooltip("Список EnemyData, из которого выбирается случайный враг.")]
+    public EnemyData[] enemyDataList;
 
     [Header("Настройки спавна")]
     [Min(0.1f)]
@@ -33,68 +31,31 @@ public class EnemySpawner : MonoBehaviour
     public float spawnInterval = 5f;
 
     [Min(0)]
-    [Tooltip("Максимум обычных врагов одновременно на сцене.")]
-    public int maxNormalEnemies = 10;
-
-    [Min(0)]
-    [Tooltip("Максимум сильных врагов одновременно на сцене.")]
-    public int maxStrongEnemies = 5;
+    [Tooltip("Максимальное количество активных врагов на сцене.")]
+    public int maxEnemies = 10;
 
     [Tooltip("Начинать ли спавн автоматически при старте.")]
     public bool spawnOnStart = true;
 
     [Header("Отладка")]
-    [Tooltip("Показывать ли логи спавна в консоли.")]
+    [Tooltip("Показывать ли логи в консоли.")]
     public bool showDebugLogs = true;
 
-    private bool isSpawning = false;
+    private bool isSpawning;
     private Coroutine spawnCoroutine;
-    // Отдельно храним врагов по типам, чтобы удобно проверять лимиты.
-    private List<EnemyBase> activeNormalEnemies = new List<EnemyBase>();
-    private List<EnemyBase> activeStrongEnemies = new List<EnemyBase>();
+    private readonly List<EnemyBase> activeEnemies = new List<EnemyBase>();
 
     private void Start()
     {
-        // Валидация данных
-        if (pool == null)
-        {
-            Debug.LogWarning($"{name}: EnemyPool не назначен! Спавн не будет работать.");
+        if (!ValidateSetup())
             return;
-        }
 
-        if (spawnPoints == null || spawnPoints.Length == 0)
-        {
-            Debug.LogWarning($"{name}: нет точек спавна! Спавн не будет работать.");
-            return;
-        }
+        WarmupPoolIfNeeded();
 
-        if (normalEnemyData == null && strongEnemyData == null)
-        {
-            Debug.LogWarning($"{name}: нет типов врагов для спавна! Спавн не будет работать.");
-            return;
-        }
-
-        // Прогреваем пул заранее.
-        // Это значит: создаём нужное количество врагов заранее и держим их выключенными.
-        if (normalEnemyData != null && normalEnemyData.prefab != null)
-        {
-            pool.Warmup(normalEnemyData.prefab, maxNormalEnemies);
-        }
-        if (strongEnemyData != null && strongEnemyData.prefab != null)
-        {
-            pool.Warmup(strongEnemyData.prefab, maxStrongEnemies);
-        }
-
-        // Запуск спавна при старте, если включено
         if (spawnOnStart)
-        {
             StartSpawning();
-        }
     }
 
-    /// <summary>
-    /// Запускает периодический спавн врагов.
-    /// </summary>
     public void StartSpawning()
     {
         if (isSpawning)
@@ -111,17 +72,10 @@ public class EnemySpawner : MonoBehaviour
             Debug.Log($"{name}: спавн врагов запущен.");
     }
 
-    /// <summary>
-    /// Останавливает периодический спавн врагов.
-    /// </summary>
     public void StopSpawning()
     {
         if (!isSpawning)
-        {
-            if (showDebugLogs)
-                Debug.LogWarning($"{name}: спавн не был запущен.");
             return;
-        }
 
         isSpawning = false;
         if (spawnCoroutine != null)
@@ -134,135 +88,157 @@ public class EnemySpawner : MonoBehaviour
             Debug.Log($"{name}: спавн врагов остановлен.");
     }
 
-    /// <summary>
-    /// Корутина для периодического спавна врагов.
-    /// </summary>
+    public EnemyBase SpawnEnemy()
+    {
+        if (!HasSpawnData())
+            return null;
+
+        CleanupInactiveEnemies();
+        if (activeEnemies.Count >= maxEnemies)
+        {
+            if (showDebugLogs)
+                Debug.Log($"{name}: достигнут лимит врагов. Пропускаем спавн.");
+            return null;
+        }
+
+        Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
+        EnemyData selectedData = PickRandomEnemyData();
+        if (selectedData == null)
+            return null;
+
+        EnemyBase enemy = pool != null
+            ? EnemyFactory.CreateEnemy(pool, selectedData, spawnPoint.position, spawnPoint.rotation)
+            : EnemyFactory.CreateEnemy(selectedData, spawnPoint.position, spawnPoint.rotation);
+
+        if (enemy == null)
+            return null;
+
+        activeEnemies.Add(enemy);
+
+        if (deathRewarder != null)
+        {
+            EnemyStats stats = enemy.GetComponent<EnemyStats>();
+            if (stats != null)
+                deathRewarder.RegisterEnemy(stats);
+        }
+
+        if (showDebugLogs)
+            Debug.Log($"{name}: создан враг {selectedData.enemyName} в точке {spawnPoint.name}");
+
+        return enemy;
+    }
+
+    public int GetCurrentEnemyCount()
+    {
+        CleanupInactiveEnemies();
+        return activeEnemies.Count;
+    }
+
     private IEnumerator SpawnCoroutine()
     {
         while (isSpawning)
         {
             yield return new WaitForSeconds(spawnInterval);
-
-            // Чистим списки от выключенных (возвращённых в пул) объектов.
-            CleanupInactiveEnemies();
-
-            // Создаём врага
-            EnemyBase enemy = SpawnEnemy();
-            if (enemy != null)
-            {
-                // Добавляем в нужный список по типу.
-                if (enemy.GetComponent<EnemyStats>() != null && enemy.GetComponent<EnemyStats>().EnemyData == normalEnemyData)
-                {
-                    activeNormalEnemies.Add(enemy);
-                }
-                else
-                {
-                    activeStrongEnemies.Add(enemy);
-                }
-            }
+            SpawnEnemy();
         }
     }
 
-    /// <summary>
-    /// Создаёт одного врага в случайной точке спавна.
-    /// </summary>
-    public EnemyBase SpawnEnemy()
+    private bool ValidateSetup()
     {
-        // Выбираем случайную точку спавна
-        if (spawnPoints.Length == 0)
+        if (spawnPoints == null || spawnPoints.Length == 0)
         {
-            Debug.LogError($"{name}: нет точек спавна!");
-            return null;
+            Debug.LogWarning($"{name}: нет точек спавна. Спавн отключён.");
+            return false;
         }
 
-        Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
+        if (!HasSpawnData())
+        {
+            Debug.LogWarning($"{name}: enemyDataList пустой или без валидных EnemyData. Спавн отключён.");
+            return false;
+        }
 
-        // Сначала чистим списки, чтобы лимиты считались правильно.
-        CleanupInactiveEnemies();
+        return true;
+    }
 
-        // Проверяем лимиты по каждому типу.
-        bool canSpawnNormal = normalEnemyData != null && activeNormalEnemies.Count < maxNormalEnemies;
-        bool canSpawnStrong = strongEnemyData != null && activeStrongEnemies.Count < maxStrongEnemies;
+    private bool HasSpawnData()
+    {
+        if (enemyDataList == null || enemyDataList.Length == 0)
+            return false;
 
-        if (!canSpawnNormal && !canSpawnStrong)
+        for (int i = 0; i < enemyDataList.Length; i++)
+        {
+            EnemyData data = enemyDataList[i];
+            if (data != null && data.prefab != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    private EnemyData PickRandomEnemyData()
+    {
+        List<EnemyData> valid = null;
+
+        for (int i = 0; i < enemyDataList.Length; i++)
+        {
+            EnemyData data = enemyDataList[i];
+            if (data == null || data.prefab == null)
+                continue;
+
+            if (valid == null)
+                valid = new List<EnemyData>();
+
+            valid.Add(data);
+        }
+
+        if (valid == null || valid.Count == 0)
         {
             if (showDebugLogs)
-                Debug.Log($"{name}: достигнуты лимиты врагов. Пропускаем спавн.");
+                Debug.LogWarning($"{name}: нет валидных EnemyData с назначенным prefab.");
             return null;
         }
 
-        // Выбираем, кого спавнить.
-        // Простой вариант: если доступны оба — выбираем случайно.
-        EnemyData enemyData;
-        if (canSpawnNormal && canSpawnStrong)
-        {
-            enemyData = Random.value < 0.7f ? normalEnemyData : strongEnemyData; // 70% обычных, 30% сильных
-        }
-        else
-        {
-            enemyData = canSpawnNormal ? normalEnemyData : strongEnemyData;
-        }
-
-        // Создаём врага через фабрику
-        EnemyBase enemy = EnemyFactory.CreateEnemy(pool, enemyData, spawnPoint.position, spawnPoint.rotation);
-
-        // Регистрируем врага в системе наград за смерть (опыт игроку).
-        if (enemy != null && deathRewarder != null)
-        {
-            EnemyStats stats = enemy.GetComponent<EnemyStats>();
-            if (stats != null)
-            {
-                deathRewarder.RegisterEnemy(stats);
-            }
-        }
-
-        if (enemy != null && showDebugLogs)
-        {
-            Debug.Log($"{name}: создан враг {enemyData.enemyName} в точке {spawnPoint.name}");
-        }
-
-        return enemy;
+        return valid[Random.Range(0, valid.Count)];
     }
 
-    /// <summary>
-    /// Очищает списки от выключенных (неактивных) объектов.
-    /// В пуле враги обычно не Destroy, а SetActive(false).
-    /// </summary>
+    private void WarmupPoolIfNeeded()
+    {
+        if (pool == null || enemyDataList == null)
+            return;
+
+        for (int i = 0; i < enemyDataList.Length; i++)
+        {
+            EnemyData data = enemyDataList[i];
+            if (data == null || data.prefab == null)
+                continue;
+
+            pool.Warmup(data.prefab, maxEnemies);
+        }
+    }
+
     private void CleanupInactiveEnemies()
     {
-        activeNormalEnemies.RemoveAll(enemy => enemy == null || !enemy.gameObject.activeInHierarchy);
-        activeStrongEnemies.RemoveAll(enemy => enemy == null || !enemy.gameObject.activeInHierarchy);
-    }
-
-    /// <summary>
-    /// Получить текущее количество живых врагов.
-    /// </summary>
-    public int GetCurrentEnemyCount()
-    {
-        CleanupInactiveEnemies();
-        return activeNormalEnemies.Count + activeStrongEnemies.Count;
+        activeEnemies.RemoveAll(enemy => enemy == null || !enemy.gameObject.activeInHierarchy);
     }
 
     private void OnDestroy()
     {
-        // Останавливаем корутину при уничтожении объекта
         StopSpawning();
     }
 
     private void OnDrawGizmosSelected()
     {
-        // Рисуем точки спавна в редакторе
         if (spawnPoints == null)
             return;
 
         Gizmos.color = Color.green;
         foreach (Transform spawnPoint in spawnPoints)
         {
-            if (spawnPoint != null)
-            {
-                Gizmos.DrawWireSphere(spawnPoint.position, 0.5f);
-                Gizmos.DrawLine(spawnPoint.position, spawnPoint.position + Vector3.up * 2f);
-            }
+            if (spawnPoint == null)
+                continue;
+
+            Gizmos.DrawWireSphere(spawnPoint.position, 0.5f);
+            Gizmos.DrawLine(spawnPoint.position, spawnPoint.position + Vector3.up * 2f);
         }
     }
 }
