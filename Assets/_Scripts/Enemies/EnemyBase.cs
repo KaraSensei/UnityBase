@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Базовое поведение врага: поиск цели, движение, атака.
@@ -11,14 +11,11 @@ public class EnemyBase : MonoBehaviour
     [SerializeField] private EnemyStats stats;
 
     [Header("Цель")]
-    [Tooltip("Текущая цель врага (обычно игрок).")]
+    [Tooltip("Текущая цель врага (обычно игрок). Если не назначена, будет найдена по тегу.")]
     [SerializeField] private Transform target;
 
-    [Header("Настройки поиска цели")]
-    [Tooltip("Слой, на котором находится игрок.")]
-    [SerializeField] private LayerMask playerLayer;
-
-    [Tooltip("Тег игрока.")]
+    [Header("Поиск цели (упрощённо)")]
+    [Tooltip("Тег игрока, по которому враг ищет цель.")]
     [SerializeField] private string playerTag = "Player";
 
     [Header("Простые тайминги (учебно)")]
@@ -44,7 +41,11 @@ public class EnemyBase : MonoBehaviour
 
     private void Start()
     {
-        FindTarget();
+        // Если цель не назначена в инспекторе — пробуем найти игрока по тегу.
+        if (target == null)
+        {
+            FindTarget();
+        }
     }
 
     private void Update()
@@ -96,26 +97,11 @@ public class EnemyBase : MonoBehaviour
         if (stats == null)
             return;
 
-        Collider[] colliders = Physics.OverlapSphere(transform.position, stats.DetectionRange, playerLayer);
-
-        if (colliders.Length == 0)
-            return;
-
+        // Упрощённый поиск: ищем объект с нужным тегом.
         if (!string.IsNullOrEmpty(playerTag))
         {
-            target = null;
-            foreach (Collider col in colliders)
-            {
-                if (col.CompareTag(playerTag))
-                {
-                    target = col.transform;
-                    break;
-                }
-            }
-        }
-        else
-        {
-            target = colliders[0].transform;
+            GameObject playerObject = GameObject.FindWithTag(playerTag);
+            target = playerObject != null ? playerObject.transform : null;
         }
 
         if (target != null)
