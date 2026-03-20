@@ -155,6 +155,7 @@ MonoBehaviour:
   - {fileID: 1136983408}
   enemyDataList:
   - {fileID: 11400000, guid: 27ff6c12ff2ad4c448eed3cf985cf1f3, type: 2}
+  - {fileID: 11400000, guid: 7a1383ee7e4e54646b1fe9a027dac6a3, type: 2}
   spawnInterval: 5
   maxEnemies: 10
   spawnOnStart: 1

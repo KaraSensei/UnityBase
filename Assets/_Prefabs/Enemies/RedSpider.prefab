@@ -62,9 +62,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   stats: {fileID: 7833258364044467622}
   target: {fileID: 0}
-  playerLayer:
-    serializedVersion: 2
-    m_Bits: 64
   playerTag: Player
   targetSearchInterval: 0.5
   attackCooldown: 1
