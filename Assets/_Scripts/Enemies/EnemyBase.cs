@@ -12,8 +12,15 @@ using UnityEngine;
 /// <summary>
 /// Базовый класс поведения врага для simple-ветки.
 /// </summary>
-public class EnemyBase : MonoBehaviour
+public class EnemyBase : MonoBehaviour, IDamageable
 {
+    private enum EnemyState
+    {
+        Chase,
+        Attack,
+        Dead
+    }
+
     [Header("Данные врага")]
     [Tooltip("ScriptableObject с базовыми параметрами врага.")]
     [SerializeField] private EnemyData enemyData;
@@ -33,8 +40,17 @@ public class EnemyBase : MonoBehaviour
     [Min(0f)]
     [SerializeField] private float attackCooldown = 1f;
 
+    [Header("Смерть")]
+    [Tooltip("Нужно ли уничтожать объект при смерти. Для pooled-врагов обычно выключается.")]
+    [SerializeField] private bool destroyOnDeath = true;
+
+    [Tooltip("Задержка перед уничтожением после смерти. Нужна для эффектов/анимаций.")]
+    [Min(0f)]
+    [SerializeField] private float destroyDelayAfterDeath = 0.15f;
+
     private float nextAttackTime;
     private bool isDead;
+    private EnemyState currentState = EnemyState.Chase;
 
     public EnemyData Data => enemyData;
     public float CurrentHealth => currentHealth;
@@ -73,9 +89,20 @@ public class EnemyBase : MonoBehaviour
             return;
 
         if (distanceToTarget <= AttackRange)
-            TryAttack();
+            currentState = EnemyState.Attack;
         else
-            MoveTowardsTarget();
+            currentState = EnemyState.Chase;
+
+        switch (currentState)
+        {
+            case EnemyState.Attack:
+                TryAttack();
+                break;
+
+            case EnemyState.Chase:
+                MoveTowardsTarget();
+                break;
+        }
     }
 
     /// <summary>
@@ -87,6 +114,7 @@ public class EnemyBase : MonoBehaviour
         currentHealth = enemyData != null ? enemyData.maxHealth : 0f;
         isDead = false;
         nextAttackTime = 0f;
+        currentState = EnemyState.Chase;
     }
 
     public virtual void TakeDamage(float damage)
@@ -108,9 +136,19 @@ public class EnemyBase : MonoBehaviour
             return;
 
         isDead = true;
+        currentState = EnemyState.Dead;
         Debug.Log($"{name}: умер.");
         OnDied?.Invoke();
-        Destroy(gameObject);
+
+        // Для объектов из пула уничтожение не выполняем:
+        // смерть обрабатывается подписчиками события OnDied (Release в пул).
+        if (!destroyOnDeath || TryGetComponent<PooledEnemy>(out _))
+            return;
+
+        if (destroyDelayAfterDeath > 0f)
+            Destroy(gameObject, destroyDelayAfterDeath);
+        else
+            Destroy(gameObject);
     }
 
     /// <summary>
@@ -133,6 +171,9 @@ public class EnemyBase : MonoBehaviour
         if (target == null)
             return;
 
+        // Точка расширения для advanced AI:
+        // на следующих этапах здесь планируется переход на NavMeshAgent
+        // и state-driven перемещение вместо прямой правки transform.position.
         Vector3 direction = (target.position - transform.position).normalized;
         direction.y = 0f;
 
@@ -149,6 +190,13 @@ public class EnemyBase : MonoBehaviour
     {
         if (target == null)
             return;
+
+        IDamageable damageable = target.GetComponent<IDamageable>();
+        if (damageable == null)
+            damageable = target.GetComponentInParent<IDamageable>();
+
+        if (damageable != null)
+            damageable.TakeDamage(Damage);
 
         Debug.Log($"{name}: атакует {target.name} с уроном {Damage}");
     }

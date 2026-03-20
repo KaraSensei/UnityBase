@@ -6,7 +6,7 @@ using UnityEngine;
 /// здоровье, мана/энергия и связанные с ними события.
 /// Хранит ТЕКУЩИЕ значения в рантайме и даёт методы для урона и лечения.
 /// </summary>
-public class PlayerStats : MonoBehaviour
+public class PlayerStats : MonoBehaviour, IDamageable
 {
     [Header("Данные игрока")]
     [Tooltip("ScriptableObject с базовыми параметрами игрока (PlayerData).")]
@@ -20,6 +20,7 @@ public class PlayerStats : MonoBehaviour
     [SerializeField]
     [Tooltip("Текущая мана (или энергия) игрока.")]
     private float currentMana;
+    private bool isDead;
 
     /// <summary>
     /// Текущее здоровье игрока (только для чтения).
@@ -32,6 +33,11 @@ public class PlayerStats : MonoBehaviour
     /// Для изменения используйте метод AddMana().
     /// </summary>
     public float CurrentMana => currentMana;
+
+    /// <summary>
+    /// Признак, что игрок мёртв (для боевой логики и блокировки управления).
+    /// </summary>
+    public bool IsDead => isDead;
 
     // События для связи с другими системами (UI, эффекты и т.п.)
     /// <summary>
@@ -75,6 +81,7 @@ public class PlayerStats : MonoBehaviour
         // Берём стартовые значения и ограничиваем их в разумных пределах.
         currentHealth = Mathf.Clamp(playerData.maxHealth, 1f, float.MaxValue);
         currentMana = Mathf.Clamp(playerData.maxMana, 0f, float.MaxValue);
+        isDead = false;
 
         // Уведомляем подписчиков о начальных значениях.
         OnHealthChanged?.Invoke(currentHealth, playerData.maxHealth);
@@ -122,7 +129,7 @@ public class PlayerStats : MonoBehaviour
         }
 
         // Не реагируем на некорректный урон или если игрок уже мёртв.
-        if (amount <= 0f || currentHealth <= 0f)
+        if (amount <= 0f || isDead)
             return;
 
         currentHealth -= amount;
@@ -132,6 +139,7 @@ public class PlayerStats : MonoBehaviour
 
         if (currentHealth <= 0f)
         {
+            isDead = true;
             // Игрок "умирает" — здесь можно запустить анимацию смерти, перезапуск уровня и т.п.
             OnDeath?.Invoke();
         }
@@ -150,7 +158,7 @@ public class PlayerStats : MonoBehaviour
         }
 
         // Нет смысла лечить на неположительное значение или лечить мёртвого.
-        if (amount <= 0f || currentHealth <= 0f)
+        if (amount <= 0f || isDead)
             return;
 
         currentHealth += amount;

@@ -148,6 +148,9 @@ public class WeaponManager : MonoBehaviour
 
     private void HandleAttackPressed()
     {
+        if (playerStats != null && playerStats.IsDead)
+            return;
+
         if (currentWeapon == null)
         {
             Debug.LogWarning("WeaponManager: у игрока нет текущего оружия, атаковать нечем.");

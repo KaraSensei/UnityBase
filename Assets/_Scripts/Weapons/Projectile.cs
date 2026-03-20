@@ -67,13 +67,12 @@ public class Projectile : MonoBehaviour
 
         Debug.Log($"Снаряд попал в {other.name}, потенциальный урон: {damage}");
 
-        // Здесь позже можно вызывать систему урона врагов.
-        // Пример на будущее (НЕ реализуем сейчас):
-        // var damageable = other.GetComponent<IDamageable>();
-        // if (damageable != null)
-        // {
-        //     damageable.TakeDamage(damage);
-        // }
+        IDamageable damageable = other.GetComponent<IDamageable>();
+        if (damageable == null)
+            damageable = other.GetComponentInParent<IDamageable>();
+
+        if (damageable != null)
+            damageable.TakeDamage(damage);
 
         Destroy(gameObject);
     }

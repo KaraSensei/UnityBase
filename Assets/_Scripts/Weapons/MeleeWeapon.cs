@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -50,19 +51,18 @@ public class MeleeWeapon : WeaponBase
         else
         {
             Debug.Log($"{name}: ближняя атака, задели {hits.Length} объект(ов).");
+            HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
 
             foreach (Collider collider in hits)
             {
-                // Здесь позже, на Этапе 8, мы будем вызывать метод получения урона
-                // у врагов (например, через EnemyStats или интерфейс IDamageable).
                 Debug.Log($"Попали по объекту: {collider.name}");
 
-                // Псевдокод на будущее (НЕ реализуем сейчас, чтобы не ломать компиляцию):
-                // var damageable = collider.GetComponent<IDamageable>();
-                // if (damageable != null)
-                // {
-                //     damageable.TakeDamage(Damage);
-                // }
+                IDamageable damageable = collider.GetComponent<IDamageable>();
+                if (damageable == null)
+                    damageable = collider.GetComponentInParent<IDamageable>();
+
+                if (damageable != null && damagedTargets.Add(damageable))
+                    damageable.TakeDamage(Damage);
             }
         }
 
