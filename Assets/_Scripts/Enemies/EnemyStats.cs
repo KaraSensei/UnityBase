@@ -2,7 +2,7 @@
  * EnemyStats
  * Назначение: совместимый адаптер над EnemyBase для систем, ожидающих EnemyStats.
  * Что делает: проксирует характеристики/урон/смерть и ретранслирует событие OnDied.
- * Связи: используется EnemyDeathRewarder, EnemyPool и другими подсистемами, где ожидается EnemyStats.
+ * Связи: используется EnemyDeathRewarder и другими подсистемами, где ожидается EnemyStats.
  * Паттерны: Adapter, Facade.
  */
 

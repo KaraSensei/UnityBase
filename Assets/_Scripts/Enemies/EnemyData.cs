@@ -1,8 +1,8 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// Данные для врага (здоровье, скорость, урон и т.п.).
-/// Используется EnemyFactory для создания врагов и EnemyBase для чтения параметров.
+/// Используется EnemySpawner для создания врагов и EnemyBase для чтения параметров.
 /// </summary>
 [CreateAssetMenu(
     fileName = "EnemyData",
