@@ -1,56 +1,67 @@
+﻿/*
+ * EnemySpawner
+ * Назначение: простой спавнер врагов для student/simple-ветки.
+ * Что делает: создаёт врагов через Instantiate по точкам спавна и ограничивает число активных врагов.
+ * Связи: использует EnemyData/EnemyBase; может быть запущен внешней encounter-системой.
+ * Паттерны: Composition, Local Validation, Fail Fast.
+ */
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Базовый спавнер врагов для этапа 7:
-/// - работает со списком EnemyData;
-/// - ограничивает общее число активных врагов;
-/// - опционально использует EnemyPool и EnemyDeathRewarder.
+/// Простой спавнер для уроков без pooling/factory.
 /// </summary>
 public class EnemySpawner : MonoBehaviour
 {
-    [Header("Опциональные системы")]
-    [Tooltip("Если назначен, враги будут создаваться через пул. Если нет, через Instantiate.")]
-    public EnemyPool pool;
-
-    [Tooltip("Если назначен, спавнер регистрирует врагов для выдачи опыта.")]
-    public EnemyDeathRewarder deathRewarder;
-
     [Header("Точки спавна")]
-    [Tooltip("Массив точек, где могут появляться враги.")]
-    public Transform[] spawnPoints;
+    [Tooltip("Набор точек, в которых могут появляться враги.")]
+    [SerializeField] private Transform[] spawnPoints;
 
     [Header("Типы врагов")]
-    [Tooltip("Список EnemyData, из которого выбирается случайный враг.")]
-    public EnemyData[] enemyDataList;
+    [Tooltip("Список конфигов врагов для случайного спавна.")]
+    [SerializeField] private EnemyData[] enemyDataList;
 
     [Header("Настройки спавна")]
+    [Tooltip("Интервал между попытками спавна.")]
     [Min(0.1f)]
-    [Tooltip("Интервал между спавнами (в секундах).")]
-    public float spawnInterval = 5f;
+    [SerializeField] private float spawnInterval = 5f;
 
+    [Tooltip("Лимит одновременно активных врагов.")]
     [Min(0)]
-    [Tooltip("Максимальное количество активных врагов на сцене.")]
-    public int maxEnemies = 10;
+    [SerializeField] private int maxEnemies = 10;
 
-    [Tooltip("Начинать ли спавн автоматически при старте.")]
-    public bool spawnOnStart = true;
+    [Tooltip("Запускать ли спавн автоматически при старте.")]
+    [SerializeField] private bool spawnOnStart = true;
 
     [Header("Отладка")]
-    [Tooltip("Показывать ли логи в консоли.")]
-    public bool showDebugLogs = true;
+    [Tooltip("Показывать подробные логи спавнера.")]
+    [SerializeField] private bool showDebugLogs = true;
 
     private bool isSpawning;
     private Coroutine spawnCoroutine;
+    private Transform playerTarget;
     private readonly List<EnemyBase> activeEnemies = new List<EnemyBase>();
+
+    /// <summary>
+    /// Текущее число активных врагов после очистки невалидных ссылок.
+    /// </summary>
+    public int CurrentEnemyCount
+    {
+        get
+        {
+            CleanupInactiveEnemies();
+            return activeEnemies.Count;
+        }
+    }
 
     private void Start()
     {
+        ResolvePlayerTarget();
+
         if (!ValidateSetup())
             return;
-
-        WarmupPoolIfNeeded();
 
         if (spawnOnStart)
             StartSpawning();
@@ -59,17 +70,10 @@ public class EnemySpawner : MonoBehaviour
     public void StartSpawning()
     {
         if (isSpawning)
-        {
-            if (showDebugLogs)
-                Debug.LogWarning($"{name}: спавн уже запущен.");
             return;
-        }
 
         isSpawning = true;
         spawnCoroutine = StartCoroutine(SpawnCoroutine());
-
-        if (showDebugLogs)
-            Debug.Log($"{name}: спавн врагов запущен.");
     }
 
     public void StopSpawning()
@@ -83,9 +87,6 @@ public class EnemySpawner : MonoBehaviour
             StopCoroutine(spawnCoroutine);
             spawnCoroutine = null;
         }
-
-        if (showDebugLogs)
-            Debug.Log($"{name}: спавн врагов остановлен.");
     }
 
     public EnemyBase SpawnEnemy()
@@ -97,41 +98,34 @@ public class EnemySpawner : MonoBehaviour
         if (activeEnemies.Count >= maxEnemies)
         {
             if (showDebugLogs)
-                Debug.Log($"{name}: достигнут лимит врагов. Пропускаем спавн.");
+                Debug.Log($"{name}: достигнут лимит врагов.");
             return null;
         }
 
         Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
         EnemyData selectedData = PickRandomEnemyData();
-        if (selectedData == null)
+        if (spawnPoint == null || selectedData == null || selectedData.prefab == null)
             return null;
 
-        EnemyBase enemy = pool != null
-            ? EnemyFactory.CreateEnemy(pool, selectedData, spawnPoint.position, spawnPoint.rotation)
-            : EnemyFactory.CreateEnemy(selectedData, spawnPoint.position, spawnPoint.rotation);
+        // В simple-ветке спавн выполняется напрямую через Instantiate.
+        GameObject enemyObject = Instantiate(selectedData.prefab, spawnPoint.position, spawnPoint.rotation);
+        EnemyBase enemy = enemyObject.GetComponent<EnemyBase>();
 
         if (enemy == null)
-            return null;
-
-        activeEnemies.Add(enemy);
-
-        if (deathRewarder != null)
         {
-            EnemyStats stats = enemy.GetComponent<EnemyStats>();
-            if (stats != null)
-                deathRewarder.RegisterEnemy(stats);
+            Debug.LogError($"{name}: у префаба {selectedData.prefab.name} отсутствует EnemyBase.", this);
+            Destroy(enemyObject);
+            return null;
         }
+
+        enemy.Setup(selectedData);
+        enemy.SetTarget(playerTarget);
+        activeEnemies.Add(enemy);
 
         if (showDebugLogs)
             Debug.Log($"{name}: создан враг {selectedData.enemyName} в точке {spawnPoint.name}");
 
         return enemy;
-    }
-
-    public int GetCurrentEnemyCount()
-    {
-        CleanupInactiveEnemies();
-        return activeEnemies.Count;
     }
 
     private IEnumerator SpawnCoroutine()
@@ -143,17 +137,23 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
+    private void ResolvePlayerTarget()
+    {
+        PlayerController player = FindFirstObjectByType<PlayerController>();
+        playerTarget = player != null ? player.transform : null;
+    }
+
     private bool ValidateSetup()
     {
         if (spawnPoints == null || spawnPoints.Length == 0)
         {
-            Debug.LogWarning($"{name}: нет точек спавна. Спавн отключён.");
+            Debug.LogWarning($"{name}: нет точек спавна. Спавн отключён.", this);
             return false;
         }
 
         if (!HasSpawnData())
         {
-            Debug.LogWarning($"{name}: enemyDataList пустой или без валидных EnemyData. Спавн отключён.");
+            Debug.LogWarning($"{name}: enemyDataList пустой или без валидных EnemyData.", this);
             return false;
         }
 
@@ -177,43 +177,23 @@ public class EnemySpawner : MonoBehaviour
 
     private EnemyData PickRandomEnemyData()
     {
-        List<EnemyData> valid = null;
-
+        List<EnemyData> validData = null;
         for (int i = 0; i < enemyDataList.Length; i++)
         {
             EnemyData data = enemyDataList[i];
             if (data == null || data.prefab == null)
                 continue;
 
-            if (valid == null)
-                valid = new List<EnemyData>();
+            if (validData == null)
+                validData = new List<EnemyData>();
 
-            valid.Add(data);
+            validData.Add(data);
         }
 
-        if (valid == null || valid.Count == 0)
-        {
-            if (showDebugLogs)
-                Debug.LogWarning($"{name}: нет валидных EnemyData с назначенным prefab.");
+        if (validData == null || validData.Count == 0)
             return null;
-        }
 
-        return valid[Random.Range(0, valid.Count)];
-    }
-
-    private void WarmupPoolIfNeeded()
-    {
-        if (pool == null || enemyDataList == null)
-            return;
-
-        for (int i = 0; i < enemyDataList.Length; i++)
-        {
-            EnemyData data = enemyDataList[i];
-            if (data == null || data.prefab == null)
-                continue;
-
-            pool.Warmup(data.prefab, maxEnemies);
-        }
+        return validData[Random.Range(0, validData.Count)];
     }
 
     private void CleanupInactiveEnemies()

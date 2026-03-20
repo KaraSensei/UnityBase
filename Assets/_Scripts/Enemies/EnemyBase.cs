@@ -1,124 +1,142 @@
+﻿/*
+ * EnemyBase
+ * Назначение: базовое поведение врага в runtime (цель, движение, атака, получение урона).
+ * Что делает: хранит состояние здоровья экземпляра, преследует цель и выполняет простую атаку по кулдауну.
+ * Связи: читает баланс из EnemyData, используется EnemySpawner и адаптером EnemyStats.
+ * Паттерны: Single Responsibility (поведение врага), Data + Runtime State.
+ */
+
+using System;
 using UnityEngine;
 
 /// <summary>
-/// Базовое поведение врага: поиск цели, движение, атака.
-/// Все статы (здоровье, урон, скорости) живут в EnemyStats.
+/// Базовый класс поведения врага для simple-ветки.
 /// </summary>
 public class EnemyBase : MonoBehaviour
 {
-    [Header("Компоненты")]
-    [Tooltip("Компонент со статами врага.")]
-    [SerializeField] private EnemyStats stats;
+    [Header("Данные врага")]
+    [Tooltip("ScriptableObject с базовыми параметрами врага.")]
+    [SerializeField] private EnemyData enemyData;
+
+    [Header("Состояние")]
+    [Tooltip("Текущее здоровье врага в рантайме.")]
+    [SerializeField] private float currentHealth;
 
     [Header("Цель")]
-    [Tooltip("Текущая цель врага (обычно игрок). Если не назначена, будет найдена по тегу.")]
+    [Tooltip("Текущая цель врага (обычно игрок).")]
     [SerializeField] private Transform target;
 
-    [Header("Поиск цели (упрощённо)")]
-    [Tooltip("Тег игрока, по которому враг ищет цель.")]
-    [SerializeField] private string playerTag = "Player";
+    [Tooltip("Пробовать ли автоматически найти цель на старте, если она не задана.")]
+    [SerializeField] private bool autoResolveTargetOnStart = true;
 
-    [Header("Простые тайминги (учебно)")]
-    [Tooltip("Как часто враг пытается искать цель, если цель не найдена.")]
-    [Min(0.05f)]
-    [SerializeField] private float targetSearchInterval = 0.5f;
-
-    [Tooltip("Минимальная пауза между атаками (чтобы не атаковать каждый кадр).")]
+    [Header("Тайминги")]
     [Min(0f)]
     [SerializeField] private float attackCooldown = 1f;
 
-    private float nextTargetSearchTime;
     private float nextAttackTime;
+    private bool isDead;
+
+    public EnemyData Data => enemyData;
+    public float CurrentHealth => currentHealth;
+    public float MaxHealth => enemyData != null ? enemyData.maxHealth : 0f;
+    public float MoveSpeed => enemyData != null ? enemyData.moveSpeed : 0f;
+    public float Damage => enemyData != null ? enemyData.damage : 0f;
+    public float AttackRange => enemyData != null ? enemyData.attackRange : 0f;
+    public float DetectionRange => enemyData != null ? enemyData.detectionRange : 0f;
+    public bool IsDead => isDead;
+
+    /// <summary>
+    /// Событие смерти врага.
+    /// Нужен как канал декуплинга для адаптеров и систем наград.
+    /// </summary>
+    public event Action OnDied;
 
     private void Awake()
     {
-        // Подтягиваем EnemyStats автоматически, чтобы префаб был устойчивым.
-        if (stats == null)
-        {
-            stats = GetComponent<EnemyStats>();
-        }
+        if (enemyData != null)
+            currentHealth = enemyData.maxHealth;
     }
 
     private void Start()
     {
-        // Если цель не назначена в инспекторе — пробуем найти игрока по тегу.
-        if (target == null)
-        {
-            FindTarget();
-        }
+        if (target == null && autoResolveTargetOnStart)
+            ResolveTargetOnce();
     }
 
     private void Update()
     {
-        if (stats == null)
+        if (enemyData == null || isDead || target == null)
             return;
-
-        if (target == null)
-        {
-            // Ищем цель не каждый кадр, а по интервалу.
-            if (Time.time >= nextTargetSearchTime)
-            {
-                nextTargetSearchTime = Time.time + targetSearchInterval;
-                FindTarget();
-            }
-            return;
-        }
 
         float distanceToTarget = Vector3.Distance(transform.position, target.position);
-
-        if (distanceToTarget > stats.DetectionRange)
-        {
-            target = null;
+        if (distanceToTarget > DetectionRange)
             return;
-        }
 
-        if (distanceToTarget <= stats.AttackRange)
-        {
+        if (distanceToTarget <= AttackRange)
             TryAttack();
-        }
         else
-        {
             MoveTowardsTarget();
-        }
     }
 
-    private void TryAttack()
+    /// <summary>
+    /// Инициализирует врага данными и сбрасывает runtime-состояние.
+    /// </summary>
+    public void Setup(EnemyData data)
     {
-        // Кулдаун защищает от атаки "каждый кадр".
-        if (Time.time < nextAttackTime)
-            return;
-
-        nextAttackTime = Time.time + attackCooldown;
-        Attack();
+        enemyData = data;
+        currentHealth = enemyData != null ? enemyData.maxHealth : 0f;
+        isDead = false;
+        nextAttackTime = 0f;
     }
 
-    public void FindTarget()
+    public virtual void TakeDamage(float damage)
     {
-        if (stats == null)
+        if (enemyData == null || damage <= 0f || isDead)
             return;
 
-        // Упрощённый поиск: ищем объект с нужным тегом.
-        if (!string.IsNullOrEmpty(playerTag))
-        {
-            GameObject playerObject = GameObject.FindWithTag(playerTag);
-            target = playerObject != null ? playerObject.transform : null;
-        }
+        currentHealth -= damage;
+        currentHealth = Mathf.Clamp(currentHealth, 0f, MaxHealth);
+        Debug.Log($"{name}: получил {damage} урона. Здоровье: {currentHealth}/{MaxHealth}");
 
-        if (target != null)
-        {
-            Debug.Log($"{name}: нашёл цель — {target.name}");
-        }
+        if (currentHealth <= 0f)
+            Die();
+    }
+
+    public virtual void Die()
+    {
+        if (isDead)
+            return;
+
+        isDead = true;
+        Debug.Log($"{name}: умер.");
+        OnDied?.Invoke();
+        Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// Внешняя установка цели (предпочтительный путь для спавнера/encounter-системы).
+    /// </summary>
+    public void SetTarget(Transform newTarget)
+    {
+        target = newTarget;
+    }
+
+    private void ResolveTargetOnce()
+    {
+        PlayerController player = FindFirstObjectByType<PlayerController>();
+        if (player != null)
+            target = player.transform;
     }
 
     public void MoveTowardsTarget()
     {
-        if (stats == null || target == null)
+        if (target == null)
             return;
 
         Vector3 direction = (target.position - transform.position).normalized;
         direction.y = 0f;
 
-        transform.position += direction * stats.MoveSpeed * Time.deltaTime;
+        transform.position += direction * MoveSpeed * Time.deltaTime;
 
         if (direction != Vector3.zero)
         {
@@ -129,29 +147,30 @@ public class EnemyBase : MonoBehaviour
 
     public virtual void Attack()
     {
-        if (stats == null || target == null)
+        if (target == null)
             return;
 
-        Debug.Log($"{name}: атакует {target.name} с уроном {stats.Damage}");
+        Debug.Log($"{name}: атакует {target.name} с уроном {Damage}");
+    }
 
-        // На Этапе 8 здесь можно будет вызывать IDamageable у цели и передавать stats.Damage.
+    private void TryAttack()
+    {
+        if (Time.time < nextAttackTime)
+            return;
+
+        nextAttackTime = Time.time + attackCooldown;
+        Attack();
     }
 
     private void OnDrawGizmosSelected()
     {
-        // Gizmos рисуются в редакторе, даже если Awake ещё не вызывался.
-        if (stats == null)
-        {
-            stats = GetComponent<EnemyStats>();
-        }
-
-        if (stats == null)
+        if (enemyData == null)
             return;
 
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, stats.DetectionRange);
+        Gizmos.DrawWireSphere(transform.position, DetectionRange);
 
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, stats.AttackRange);
+        Gizmos.DrawWireSphere(transform.position, AttackRange);
     }
 }

@@ -49,7 +49,6 @@ MonoBehaviour:
   weaponData: {fileID: 11400000, guid: cb530b5602c8332428e5508864912d86, type: 2}
   owner: {fileID: 0}
   shootOrigin: {fileID: 3068616479328534371}
-  projectileSpeedOverride: 0
   projectileHitLayers:
     serializedVersion: 2
     m_Bits: 128

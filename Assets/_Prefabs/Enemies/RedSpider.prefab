@@ -9,7 +9,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 551193179983197283}
-  - component: {fileID: 7833258364044467622}
   - component: {fileID: 3304280534762641515}
   m_Layer: 7
   m_Name: RedSpider
@@ -34,20 +33,6 @@ Transform:
   - {fileID: 2401328704413906142}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &7833258364044467622
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 835341589936999249}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0cde95a7423c88844983ac32f9ce5180, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  enemyData: {fileID: 11400000, guid: 7a1383ee7e4e54646b1fe9a027dac6a3, type: 2}
-  currentHealth: 0
 --- !u!114 &3304280534762641515
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -60,7 +45,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c045e341e04d04b42a715bfe165c0621, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  stats: {fileID: 7833258364044467622}
+  enemyData: {fileID: 11400000, guid: 7a1383ee7e4e54646b1fe9a027dac6a3, type: 2}
+  currentHealth: 0
   target: {fileID: 0}
   playerTag: Player
   targetSearchInterval: 0.5

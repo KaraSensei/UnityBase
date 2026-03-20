@@ -135,7 +135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &46129962
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -155,10 +155,9 @@ MonoBehaviour:
   - {fileID: 1136983408}
   enemyDataList:
   - {fileID: 11400000, guid: 27ff6c12ff2ad4c448eed3cf985cf1f3, type: 2}
-  - {fileID: 11400000, guid: 7a1383ee7e4e54646b1fe9a027dac6a3, type: 2}
   spawnInterval: 5
   maxEnemies: 10
-  spawnOnStart: 1
+  spawnOnStart: 0
   showDebugLogs: 1
 --- !u!4 &46129963
 Transform:
@@ -1920,6 +1919,40 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6749953907797031108, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
   m_PrefabInstance: {fileID: 5039514878538700876}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &713370000000000001
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 551193179983197283, guid: 7669348b23c156040867c5ce0900a6d0, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 29
+      objectReference: {fileID: 0}
+    - target: {fileID: 551193179983197283, guid: 7669348b23c156040867c5ce0900a6d0, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -1.44
+      objectReference: {fileID: 0}
+    - target: {fileID: 551193179983197283, guid: 7669348b23c156040867c5ce0900a6d0, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 36
+      objectReference: {fileID: 0}
+    - target: {fileID: 835341589936999249, guid: 7669348b23c156040867c5ce0900a6d0, type: 3}
+      propertyPath: m_Name
+      value: Lesson1_DefaultSpider
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 7669348b23c156040867c5ce0900a6d0, type: 3}
+--- !u!4 &713370000000000002 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 551193179983197283, guid: 7669348b23c156040867c5ce0900a6d0, type: 3}
+  m_PrefabInstance: {fileID: 713370000000000001}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1933,4 +1966,5 @@ SceneRoots:
   - {fileID: 219436328}
   - {fileID: 1642967614}
   - {fileID: 1723131370}
+  - {fileID: 713370000000000002}
   - {fileID: 46129963}

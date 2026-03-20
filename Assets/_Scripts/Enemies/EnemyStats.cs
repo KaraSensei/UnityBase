@@ -1,97 +1,102 @@
-﻿using System;
+/*
+ * EnemyStats
+ * Назначение: совместимый адаптер над EnemyBase для систем, ожидающих EnemyStats.
+ * Что делает: проксирует характеристики/урон/смерть и ретранслирует событие OnDied.
+ * Связи: используется EnemyDeathRewarder, EnemyPool и другими подсистемами, где ожидается EnemyStats.
+ * Паттерны: Adapter, Facade.
+ */
+
+using System;
 using UnityEngine;
 
 /// <summary>
-/// Отвечает за статы врага: здоровье, урон, скорость и т.п.
-/// Читает базовые числа из EnemyData и хранит текущее состояние.
+/// Адаптер к EnemyBase для совместимости с системами наград/подписок.
+/// Источник истины по здоровью/смерти находится в EnemyBase.
 /// </summary>
 public class EnemyStats : MonoBehaviour
 {
-    [Header("Данные врага")]
-    [Tooltip("ScriptableObject с базовыми параметрами врага.")]
-    [SerializeField] private EnemyData enemyData;
+    [Header("Ссылки")]
+    [Tooltip("Компонент EnemyBase, который хранит runtime-состояние врага.")]
+    [SerializeField] private EnemyBase enemyBase;
 
-    [Header("Состояние")]
-    [Tooltip("Текущее здоровье врага.")]
-    [SerializeField] private float currentHealth;
-
-    public EnemyData EnemyData => enemyData;
-    public float MaxHealth => enemyData != null ? enemyData.maxHealth : 0f;
-    public float MoveSpeed => enemyData != null ? enemyData.moveSpeed : 0f;
-    public float Damage => enemyData != null ? enemyData.damage : 0f;
-    public float AttackRange => enemyData != null ? enemyData.attackRange : 0f;
-    public float DetectionRange => enemyData != null ? enemyData.detectionRange : 0f;
-    public float ExperienceReward => enemyData != null ? enemyData.experienceReward : 0f;
+    public EnemyData EnemyData => enemyBase != null ? enemyBase.Data : null;
+    public float MaxHealth => enemyBase != null ? enemyBase.MaxHealth : 0f;
+    public float MoveSpeed => enemyBase != null ? enemyBase.MoveSpeed : 0f;
+    public float Damage => enemyBase != null ? enemyBase.Damage : 0f;
+    public float AttackRange => enemyBase != null ? enemyBase.AttackRange : 0f;
+    public float DetectionRange => enemyBase != null ? enemyBase.DetectionRange : 0f;
+    public float ExperienceReward => EnemyData != null ? EnemyData.experienceReward : 0f;
 
     /// <summary>
-    /// Событие "враг умер".
-    /// На него будут подписываться другие системы: пул врагов, система опыта и т.д.
+    /// Событие смерти в формате EnemyStats для обратной совместимости.
     /// </summary>
     public event Action<EnemyStats> OnDied;
 
     private void Awake()
     {
-        // Awake вызывается сразу после создания объекта.
-        // Если данные назначены в инспекторе — можно инициализировать состояние сразу.
-        // Если враг создаётся фабрикой, она вызовет Setup(data) после назначения EnemyData.
-        if (enemyData != null)
-        {
-            InitializeFromData();
-        }
+        if (enemyBase == null)
+            enemyBase = GetComponent<EnemyBase>();
+
+        if (enemyBase == null)
+            Debug.LogError("EnemyStats: отсутствует EnemyBase на объекте.", this);
+    }
+
+    private void OnEnable()
+    {
+        if (enemyBase != null)
+            enemyBase.OnDied += HandleEnemyBaseDied;
+    }
+
+    private void OnDisable()
+    {
+        if (enemyBase != null)
+            enemyBase.OnDied -= HandleEnemyBaseDied;
     }
 
     /// <summary>
-    /// Единая точка инициализации для врагов, созданных через фабрику.
+    /// Совместимый метод инициализации из EnemyData.
     /// </summary>
     public void Setup(EnemyData data)
     {
-        enemyData = data;
-        InitializeFromData();
+        if (enemyBase == null)
+        {
+            Debug.LogWarning("EnemyStats.Setup: EnemyBase не назначен.", this);
+            return;
+        }
+
+        enemyBase.Setup(data);
     }
 
     /// <summary>
-    /// Инициализирует текущее здоровье из EnemyData.
-    /// </summary>
-    public void InitializeFromData()
-    {
-        // EnemyData — конфиг, currentHealth — runtime-состояние экземпляра.
-        if (enemyData != null)
-        {
-            currentHealth = enemyData.maxHealth;
-        }
-        else
-        {
-            currentHealth = 0f;
-        }
-    }
-
-    /// <summary>
-    /// Получение урона.
+    /// Совместимый метод получения урона.
     /// </summary>
     public void TakeDamage(float damage)
     {
-        if (damage <= 0f)
-            return;
-
-        currentHealth -= damage;
-        Debug.Log($"{name}: получил {damage} урона. Здоровье: {currentHealth}/{MaxHealth}");
-
-        if (currentHealth <= 0f)
+        if (enemyBase == null)
         {
-            Die();
+            Debug.LogWarning("EnemyStats.TakeDamage: EnemyBase не назначен.", this);
+            return;
         }
+
+        enemyBase.TakeDamage(damage);
     }
 
     /// <summary>
-    /// Смерть врага.
+    /// Совместимый метод смерти.
     /// </summary>
     public virtual void Die()
     {
-        Debug.Log($"{name}: умер! Награда за убийство: {ExperienceReward} опыта.");
+        if (enemyBase == null)
+        {
+            Debug.LogWarning("EnemyStats.Die: EnemyBase не назначен.", this);
+            return;
+        }
 
-        // Здесь мы только "сообщаем" всем подписчикам, что этот враг умер.
-        // Что именно делать дальше (вернуть в пул, дать опыт игроку и т.п.)
-        // решают другие системы, которые подписались на это событие.
+        enemyBase.Die();
+    }
+
+    private void HandleEnemyBaseDied()
+    {
         OnDied?.Invoke(this);
     }
 }

@@ -1,17 +1,22 @@
+﻿/*
+ * EnemyFactory
+ * Назначение: фабрика создания врагов для advanced/reference-пути.
+ * Что делает: централизует создание EnemyBase по EnemyData.
+ * Связи: используется advanced-веткой (pool/factory), не обязателен для simple-спавна.
+ * Паттерны: Factory Method.
+ */
+
 using UnityEngine;
 
 /// <summary>
-/// Фабрика для создания врагов на основе EnemyData.
-/// Поддерживает два режима:
-/// 1) Через EnemyPool (если он передан).
-/// 2) Через обычный Instantiate (если pool == null).
+/// Фабрика создания врагов для advanced-ветки.
 /// </summary>
 public static class EnemyFactory
 {
     /// <summary>
-    /// Создаёт врага из EnemyData в нужной позиции/повороте.
+    /// Создаёт врага по EnemyData через Instantiate.
     /// </summary>
-    public static EnemyBase CreateEnemy(EnemyPool pool, EnemyData data, Vector3 position, Quaternion rotation)
+    public static EnemyBase CreateEnemy(EnemyData data, Vector3 position, Quaternion rotation)
     {
         if (data == null)
         {
@@ -25,51 +30,41 @@ public static class EnemyFactory
             return null;
         }
 
-        GameObject enemyObject = pool != null
-            ? pool.Get(data.prefab, position, rotation)
-            : Object.Instantiate(data.prefab, position, rotation);
-
-        if (enemyObject == null)
-            return null;
-
-        EnemyStats stats = enemyObject.GetComponent<EnemyStats>();
-        if (stats == null)
-        {
-            Debug.LogWarning($"EnemyFactory.CreateEnemy: у префаба {data.prefab.name} нет EnemyStats. Добавляю...");
-            stats = enemyObject.AddComponent<EnemyStats>();
-        }
-        stats.Setup(data);
-
-        if (pool != null)
-            pool.RegisterEnemy(stats);
-
+        GameObject enemyObject = Object.Instantiate(data.prefab, position, rotation);
         EnemyBase enemy = enemyObject.GetComponent<EnemyBase>();
+
         if (enemy == null)
         {
-            Debug.LogWarning($"EnemyFactory.CreateEnemy: у префаба {data.prefab.name} нет EnemyBase. Добавляю...");
-            enemy = enemyObject.AddComponent<EnemyBase>();
+            // Fail fast: ошибки сборки префаба не должны скрываться в runtime.
+            Debug.LogError($"EnemyFactory.CreateEnemy: у префаба {data.prefab.name} отсутствует EnemyBase.");
+            Object.Destroy(enemyObject);
+            return null;
         }
 
+        enemy.Setup(data);
         return enemy;
-    }
-
-    public static EnemyBase CreateEnemy(EnemyPool pool, EnemyData data, Vector3 position)
-    {
-        return CreateEnemy(pool, data, position, Quaternion.identity);
-    }
-
-    public static EnemyBase CreateEnemy(EnemyPool pool, EnemyData data)
-    {
-        return CreateEnemy(pool, data, Vector3.zero, Quaternion.identity);
-    }
-
-    public static EnemyBase CreateEnemy(EnemyData data, Vector3 position, Quaternion rotation)
-    {
-        return CreateEnemy(null, data, position, rotation);
     }
 
     public static EnemyBase CreateEnemy(EnemyData data, Vector3 position)
     {
-        return CreateEnemy(null, data, position, Quaternion.identity);
+        return CreateEnemy(data, position, Quaternion.identity);
+    }
+
+    /// <summary>
+    /// Совместимость со старым API: pool параметр пока не влияет на simple-фабричный путь.
+    /// </summary>
+    public static EnemyBase CreateEnemy(EnemyPool pool, EnemyData data, Vector3 position, Quaternion rotation)
+    {
+        return CreateEnemy(data, position, rotation);
+    }
+
+    public static EnemyBase CreateEnemy(EnemyPool pool, EnemyData data, Vector3 position)
+    {
+        return CreateEnemy(data, position, Quaternion.identity);
+    }
+
+    public static EnemyBase CreateEnemy(EnemyPool pool, EnemyData data)
+    {
+        return CreateEnemy(data, Vector3.zero, Quaternion.identity);
     }
 }
