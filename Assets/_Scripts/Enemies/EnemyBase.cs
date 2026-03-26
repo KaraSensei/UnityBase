@@ -1,4 +1,4 @@
-﻿/*
+/*
  * EnemyBase
  * Назначение: базовое поведение врага в runtime (цель, движение, атака, получение урона).
  * Что делает: хранит состояние здоровья экземпляра, преследует цель и выполняет простую атаку по кулдауну.
@@ -53,18 +53,26 @@ public class EnemyBase : MonoBehaviour
 
     private void Awake()
     {
+        // Важно для учеников:
+        // Awake вызывается при создании объекта (в том числе сразу после Instantiate).
+        // Здесь мы можем подготовить runtime-состояние (например, здоровье),
+        // если EnemyData уже назначен в инспекторе на префабе.
         if (enemyData != null)
             currentHealth = enemyData.maxHealth;
     }
 
     private void Start()
     {
+        // Start вызывается после Awake (обычно на первом кадре).
+        // Здесь удобно делать “поиск внешнего мира”: найти игрока и выставить цель.
         if (target == null && autoResolveTargetOnStart)
             ResolveTargetOnce();
     }
 
     private void Update()
     {
+        // Update — “мозг” врага. Здесь мы НЕ должны делать тяжёлые операции,
+        // поэтому логика максимально простая: проверили дистанцию → решили действие.
         if (enemyData == null || isDead || target == null)
             return;
 
@@ -80,6 +88,7 @@ public class EnemyBase : MonoBehaviour
 
     /// <summary>
     /// Инициализирует врага данными и сбрасывает runtime-состояние.
+    /// Обычно вызывается спавнером сразу после создания врага.
     /// </summary>
     public void Setup(EnemyData data)
     {
@@ -89,6 +98,11 @@ public class EnemyBase : MonoBehaviour
         nextAttackTime = 0f;
     }
 
+    /// <summary>
+    /// Получение урона врагом.
+    /// virtual — чтобы в будущем можно было переопределить правила урона у наследников
+    /// (например, броня/щит/иммунитеты), не меняя код спавнера и оружия.
+    /// </summary>
     public virtual void TakeDamage(float damage)
     {
         if (enemyData == null || damage <= 0f || isDead)
@@ -102,6 +116,13 @@ public class EnemyBase : MonoBehaviour
             Die();
     }
 
+    /// <summary>
+    /// Смерть врага (базовая реализация).
+    /// Здесь мы:
+    ///  - защищаемся от двойной смерти (isDead);
+    ///  - отправляем событие OnDied как “сигнал” для других систем;
+    ///  - удаляем объект со сцены.
+    /// </summary>
     public virtual void Die()
     {
         if (isDead)
@@ -123,11 +144,18 @@ public class EnemyBase : MonoBehaviour
 
     private void ResolveTargetOnce()
     {
+        // Учебное упрощение:
+        // ищем первый PlayerController на сцене и используем его transform как цель.
+        // Это проще, чем слои/рейкасты/“зрение” с препятствиями.
         PlayerController player = FindFirstObjectByType<PlayerController>();
         if (player != null)
             target = player.transform;
     }
 
+    /// <summary>
+    /// Простое движение к цели “вручную” (без NavMesh).
+    /// В более продвинутой версии это заменится на NavMeshAgent.
+    /// </summary>
     public void MoveTowardsTarget()
     {
         if (target == null)
@@ -145,6 +173,11 @@ public class EnemyBase : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Атака врага (базовая реализация).
+    /// В этом файле атака пока “символическая” (лог в консоль) — так проще отделить поведение
+    /// (подошёл и атакует) от боевой модели (кто кому наносит урон), которая разбирается отдельно.
+    /// </summary>
     public virtual void Attack()
     {
         if (target == null)
@@ -155,6 +188,8 @@ public class EnemyBase : MonoBehaviour
 
     private void TryAttack()
     {
+        // Кулдаун — защита от атаки “каждый кадр”.
+        // Без него враг атаковал бы 60+ раз в секунду, что ломает геймплей.
         if (Time.time < nextAttackTime)
             return;
 
