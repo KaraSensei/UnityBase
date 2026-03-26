@@ -33,6 +33,8 @@ public class MeleeWeapon : WeaponBase
             return;
         }
 
+        // Важно для урока 7.2 (урон через IDamageable):
+        // правило “игрок бьёт только врагов” обеспечивается настройкой hitLayers в инспекторе (обычно только слой Enemy).
         // Если не указан радиус, используем Range из WeaponData
         float radius = hitRadius > 0f ? hitRadius : Range;
 
@@ -41,7 +43,9 @@ public class MeleeWeapon : WeaponBase
             ? attackOrigin.position
             : (Owner != null ? Owner.position : transform.position);
 
-        // Простой поиск попаданий
+        // Простой поиск попаданий.
+        // OverlapSphere может вернуть несколько коллайдеров одного и того же врага,
+        // поэтому HashSet защищает от нанесения урона несколько раз за одну атаку.
         Collider[] hits = Physics.OverlapSphere(origin, radius, hitLayers);
 
         if (hits.Length == 0)

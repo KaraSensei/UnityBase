@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -140,6 +140,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (currentHealth <= 0f)
         {
             isDead = true;
+            Debug.Log($"{name}: игрок умер.");
             // Игрок "умирает" — здесь можно запустить анимацию смерти, перезапуск уровня и т.п.
             OnDeath?.Invoke();
         }

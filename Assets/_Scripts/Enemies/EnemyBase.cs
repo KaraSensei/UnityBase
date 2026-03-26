@@ -92,6 +92,15 @@ public class EnemyBase : MonoBehaviour, IDamageable
         if (enemyData == null || isDead || target == null)
             return;
 
+        IDamageable targetDamageable = target.GetComponent<IDamageable>();
+        if (targetDamageable == null)
+            targetDamageable = target.GetComponentInParent<IDamageable>();
+
+        // Минимальный guard для завершённого боевого цикла:
+        // если цель уже мертва, враг прекращает преследование и атаку.
+        if (targetDamageable != null && targetDamageable.IsDead)
+            return;
+
         float distanceToTarget = Vector3.Distance(transform.position, target.position);
         if (distanceToTarget > DetectionRange)
             return;
@@ -163,7 +172,10 @@ public class EnemyBase : MonoBehaviour, IDamageable
 
         // Для объектов из пула уничтожение не выполняем:
         // смерть обрабатывается подписчиками события OnDied (Release в пул).
-        if (!destroyOnDeath || TryGetComponent<PooledEnemy>(out _))
+        // Проверяем "пуловость" по имени компонента, чтобы не иметь жёсткой зависимости
+        // от класса PooledEnemy (его может не быть в simple-ветке проекта).
+        bool isPooledEnemy = GetComponent("PooledEnemy") != null;
+        if (!destroyOnDeath || isPooledEnemy)
             return;
 
         if (destroyDelayAfterDeath > 0f)
@@ -224,11 +236,15 @@ public class EnemyBase : MonoBehaviour, IDamageable
         if (target == null)
             return;
 
+        // Важно для урока 7.2 (урон через IDamageable):
+        // враг не делает “поиск целей по слоям” и не бьёт всех вокруг.
+        // Он наносит урон строго своей цели target (обычно игрок), которую нужно корректно назначить
+        // через авто-резолв на старте или методом SetTarget() при спавне/инициализации.
         IDamageable damageable = target.GetComponent<IDamageable>();
         if (damageable == null)
             damageable = target.GetComponentInParent<IDamageable>();
 
-        if (damageable != null)
+        if (damageable != null && !damageable.IsDead)
             damageable.TakeDamage(Damage);
 
         Debug.Log($"{name}: атакует {target.name} с уроном {Damage}");

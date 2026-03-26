@@ -48,9 +48,10 @@ MonoBehaviour:
   enemyData: {fileID: 11400000, guid: 27ff6c12ff2ad4c448eed3cf985cf1f3, type: 2}
   currentHealth: 0
   target: {fileID: 0}
-  playerTag: Player
-  targetSearchInterval: 0.5
+  autoResolveTargetOnStart: 1
   attackCooldown: 1
+  destroyOnDeath: 1
+  destroyDelayAfterDeath: 0.15
 --- !u!1 &7634679893059001861
 GameObject:
   m_ObjectHideFlags: 0
