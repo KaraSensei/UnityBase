@@ -2,7 +2,7 @@
  * EnemyStats
  * Назначение: совместимый адаптер над EnemyBase для систем, ожидающих EnemyStats.
  * Что делает: проксирует характеристики/урон/смерть и ретранслирует событие OnDied.
- * Связи: используется EnemyDeathRewarder, EnemyPool и другими подсистемами, где ожидается EnemyStats.
+ * Связи: используется EnemyDeathRewarder и другими подсистемами, где ожидается EnemyStats.
  * Паттерны: Adapter, Facade.
  */
 
@@ -34,6 +34,8 @@ public class EnemyStats : MonoBehaviour
 
     private void Awake()
     {
+        // EnemyStats — компонент “обвязки”.
+        // Чтобы префабы были устойчивыми, стараемся автоматически найти EnemyBase на том же объекте.
         if (enemyBase == null)
             enemyBase = GetComponent<EnemyBase>();
 
@@ -43,12 +45,15 @@ public class EnemyStats : MonoBehaviour
 
     private void OnEnable()
     {
+        // Важно: подписки на события делаем в OnEnable,
+        // чтобы при Disable/Enable компонента не оставались “висячие” подписки.
         if (enemyBase != null)
             enemyBase.OnDied += HandleEnemyBaseDied;
     }
 
     private void OnDisable()
     {
+        // И симметрично отписываемся в OnDisable.
         if (enemyBase != null)
             enemyBase.OnDied -= HandleEnemyBaseDied;
     }
@@ -58,6 +63,8 @@ public class EnemyStats : MonoBehaviour
     /// </summary>
     public void Setup(EnemyData data)
     {
+        // В большинстве случаев EnemyData назначается не в инспекторе, а “снаружи”:
+        // спавнер создаёт префаб и передаёт конфиг врага методом Setup(data).
         if (enemyBase == null)
         {
             Debug.LogWarning("EnemyStats.Setup: EnemyBase не назначен.", this);
@@ -72,6 +79,7 @@ public class EnemyStats : MonoBehaviour
     /// </summary>
     public void TakeDamage(float damage)
     {
+        // EnemyStats не хранит здоровье сам — он только прокидывает вызов в EnemyBase.
         if (enemyBase == null)
         {
             Debug.LogWarning("EnemyStats.TakeDamage: EnemyBase не назначен.", this);
@@ -86,6 +94,7 @@ public class EnemyStats : MonoBehaviour
     /// </summary>
     public virtual void Die()
     {
+        // Аналогично: смерть хранится в EnemyBase, а EnemyStats оставлен для совместимости API.
         if (enemyBase == null)
         {
             Debug.LogWarning("EnemyStats.Die: EnemyBase не назначен.", this);
@@ -97,6 +106,8 @@ public class EnemyStats : MonoBehaviour
 
     private void HandleEnemyBaseDied()
     {
+        // Переводим событие “умер EnemyBase” в событие “умер EnemyStats”.
+        // Так системам наград/спавна/пула удобнее работать с одним типом события.
         OnDied?.Invoke(this);
     }
 }
