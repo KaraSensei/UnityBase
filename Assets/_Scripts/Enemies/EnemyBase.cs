@@ -1,4 +1,4 @@
-/*
+﻿/*
  * EnemyBase
  * Назначение: базовое поведение врага в runtime (цель, движение, атака, получение урона).
  * Что делает: хранит состояние здоровья экземпляра, преследует цель и выполняет простую атаку по кулдауну.
@@ -60,6 +60,7 @@ public class EnemyBase : MonoBehaviour, IDamageable
     public float AttackRange => enemyData != null ? enemyData.attackRange : 0f;
     public float DetectionRange => enemyData != null ? enemyData.detectionRange : 0f;
     public bool IsDead => isDead;
+    protected Transform CurrentTarget => target;
 
     /// <summary>
     /// Событие смерти врага.

@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 551193179983197283}
   - component: {fileID: 3304280534762641515}
   m_Layer: 7
-  m_Name: RedSpider
+  m_Name: SkeletonRanged
   m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -31,6 +31,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2401328704413906142}
+  - {fileID: 5496668866124545399}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3304280534762641515
@@ -42,16 +43,55 @@ MonoBehaviour:
   m_GameObject: {fileID: 835341589936999249}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c045e341e04d04b42a715bfe165c0621, type: 3}
+  m_Script: {fileID: 11500000, guid: b3c41f98d6f24cb2b2b88960e64d4f1e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enemyData: {fileID: 11400000, guid: 7a1383ee7e4e54646b1fe9a027dac6a3, type: 2}
+  enemyData: {fileID: 11400000, guid: 08d28f3595742b1439cc4cfe0264cbd3, type: 2}
   currentHealth: 0
   target: {fileID: 0}
   autoResolveTargetOnStart: 1
   attackCooldown: 1
   destroyOnDeath: 1
   destroyDelayAfterDeath: 0.15
+  projectilePrefab: {fileID: 3081234000597191149, guid: 54770955d7db26445821108d1df566d6, type: 3}
+  shootOrigin: {fileID: 5496668866124545399}
+  projectileHitLayers:
+    serializedVersion: 2
+    m_Bits: 64
+  projectileSpeed: 12
+  projectileDistance: 12
+  aimOffsetY: 1
+--- !u!1 &5365847539324844419
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5496668866124545399}
+  m_Layer: 7
+  m_Name: ShootOrigin
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5496668866124545399
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5365847539324844419}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.823, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 551193179983197283}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7634679893059001861
 GameObject:
   m_ObjectHideFlags: 0
@@ -102,15 +142,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 476090, guid: e8a98f96516902e4384263b5d25a25c6, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.57
+      value: 0.3
       objectReference: {fileID: 0}
     - target: {fileID: 476090, guid: e8a98f96516902e4384263b5d25a25c6, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.57
+      value: 0.3
       objectReference: {fileID: 0}
     - target: {fileID: 476090, guid: e8a98f96516902e4384263b5d25a25c6, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.57
+      value: 0.3
       objectReference: {fileID: 0}
     - target: {fileID: 476090, guid: e8a98f96516902e4384263b5d25a25c6, type: 3}
       propertyPath: m_LocalPosition.x
@@ -156,10 +196,6 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: 13775942, guid: e8a98f96516902e4384263b5d25a25c6, type: 3}
-      propertyPath: 'm_Materials.Array.data[0]'
-      value: 
-      objectReference: {fileID: 2100000, guid: c34d4756da5cf1c46947756873972615, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

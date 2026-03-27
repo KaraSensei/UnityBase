@@ -17,7 +17,7 @@ MonoBehaviour:
   maxHealth: 50
   moveSpeed: 3
   damage: 10
-  attackRange: 2
-  detectionRange: 10
+  attackRange: 12
+  detectionRange: 16
   experienceReward: 10
-  prefab: {fileID: 835341589936999249, guid: 7669348b23c156040867c5ce0900a6d0, type: 3}
+  prefab: {fileID: 835341589936999249, guid: 9f1a4f0a2ed6464aba6bc3ab3dc4e63f, type: 3}

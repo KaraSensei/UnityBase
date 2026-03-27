@@ -1,61 +1,58 @@
+/*
+ * SimpleEnemySpawner
+ * Назначение: учебный спавнер врагов через Instantiate для simple-ветки.
+ * Что делает: создаёт врагов в случайных spawn points, держит лимит активных и управляет циклом спавна.
+ * Связи: использует EnemyData/EnemyBase, при наличии назначает цель через PlayerController.
+ * Паттерны: Composition, Fail Fast, Local Validation.
+ */
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Упрощённый спавнер врагов для базового обучения.
-/// Не использует сложный пул и словари — только Instantiate и простой список.
+/// Упрощённый спавнер врагов для базового обучения без pooling/factory.
 /// </summary>
 public class SimpleEnemySpawner : MonoBehaviour
 {
     [Header("Тип врага")]
     [Tooltip("Данные врага, которого будем спавнить.")]
-    public EnemyData enemyData;
+    [SerializeField] private EnemyData enemyData;
 
     [Header("Точки спавна")]
     [Tooltip("Массив точек, где могут появляться враги.")]
-    public Transform[] spawnPoints;
+    [SerializeField] private Transform[] spawnPoints;
 
     [Header("Настройки спавна")]
     [Min(0.1f)]
     [Tooltip("Интервал между спавнами (в секундах).")]
-    public float spawnInterval = 5f;
+    [SerializeField] private float spawnInterval = 5f;
 
     [Min(0)]
-    [Tooltip("Максимальное количество врагов одновременно на сцене.")]
-    public int maxEnemies = 10;
+    [Tooltip("Максимальное количество одновременно активных врагов.")]
+    [SerializeField] private int maxEnemies = 10;
 
-    [Tooltip("Начинать ли спавн автоматически при старте.")]
-    public bool spawnOnStart = true;
+    [Tooltip("Запускать ли спавн автоматически при старте.")]
+    [SerializeField] private bool spawnOnStart = true;
 
     [Header("Отладка")]
-    [Tooltip("Показывать ли логи спавна в консоли.")]
-    public bool showDebugLogs = true;
+    [Tooltip("Показывать подробные логи спавнера.")]
+    [SerializeField] private bool showDebugLogs = true;
 
     private bool isSpawning;
     private Coroutine spawnCoroutine;
-
-    // Простой список для отслеживания созданных врагов.
+    private Transform playerTarget;
     private readonly List<EnemyBase> activeEnemies = new List<EnemyBase>();
 
     private void Start()
     {
-        if (enemyData == null || enemyData.prefab == null)
-        {
-            Debug.LogWarning($"{name}: SimpleEnemySpawner — не назначены EnemyData или prefab.");
-            return;
-        }
+        ResolvePlayerTarget();
 
-        if (spawnPoints == null || spawnPoints.Length == 0)
-        {
-            Debug.LogWarning($"{name}: SimpleEnemySpawner — нет точек спавна.");
+        if (!ValidateSetup())
             return;
-        }
 
         if (spawnOnStart)
-        {
             StartSpawning();
-        }
     }
 
     public void StartSpawning()
@@ -63,7 +60,7 @@ public class SimpleEnemySpawner : MonoBehaviour
         if (isSpawning)
         {
             if (showDebugLogs)
-                Debug.LogWarning($"{name}: спавн уже запущен.");
+                Debug.LogWarning($"{name}: спавн уже запущен.", this);
             return;
         }
 
@@ -71,7 +68,7 @@ public class SimpleEnemySpawner : MonoBehaviour
         spawnCoroutine = StartCoroutine(SpawnCoroutine());
 
         if (showDebugLogs)
-            Debug.Log($"{name}: спавн врагов запущен.");
+            Debug.Log($"{name}: спавн врагов запущен.", this);
     }
 
     public void StopSpawning()
@@ -79,7 +76,7 @@ public class SimpleEnemySpawner : MonoBehaviour
         if (!isSpawning)
         {
             if (showDebugLogs)
-                Debug.LogWarning($"{name}: спавн не был запущен.");
+                Debug.LogWarning($"{name}: спавн не был запущен.", this);
             return;
         }
 
@@ -91,7 +88,51 @@ public class SimpleEnemySpawner : MonoBehaviour
         }
 
         if (showDebugLogs)
-            Debug.Log($"{name}: спавн врагов остановлен.");
+            Debug.Log($"{name}: спавн врагов остановлен.", this);
+    }
+
+    public EnemyBase SpawnEnemy()
+    {
+        if (!ValidateSetup())
+            return null;
+
+        if (playerTarget == null)
+            ResolvePlayerTarget();
+
+        CleanupInactiveEnemies();
+        if (activeEnemies.Count >= maxEnemies)
+        {
+            if (showDebugLogs)
+                Debug.Log($"{name}: достигнут лимит врагов. Пропускаем спавн.", this);
+            return null;
+        }
+
+        Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
+        if (spawnPoint == null)
+        {
+            Debug.LogWarning($"{name}: одна из spawn points не назначена.", this);
+            return null;
+        }
+
+        GameObject enemyObject = Instantiate(enemyData.prefab, spawnPoint.position, spawnPoint.rotation);
+        EnemyBase enemy = enemyObject.GetComponent<EnemyBase>();
+        if (enemy == null)
+        {
+            Debug.LogError($"{name}: на префабе {enemyData.prefab.name} отсутствует EnemyBase.", this);
+            Destroy(enemyObject);
+            return null;
+        }
+
+        enemy.Setup(enemyData);
+        if (playerTarget != null)
+            enemy.SetTarget(playerTarget);
+
+        activeEnemies.Add(enemy);
+
+        if (showDebugLogs)
+            Debug.Log($"{name}: создан враг {enemyData.enemyName} в точке {spawnPoint.name}.", this);
+
+        return enemy;
     }
 
     private IEnumerator SpawnCoroutine()
@@ -99,62 +140,36 @@ public class SimpleEnemySpawner : MonoBehaviour
         while (isSpawning)
         {
             yield return new WaitForSeconds(spawnInterval);
-
-            CleanupInactiveEnemies();
-
-            if (activeEnemies.Count >= maxEnemies)
-            {
-                if (showDebugLogs)
-                    Debug.Log($"{name}: достигнут лимит врагов. Пропускаем спавн.");
-                continue;
-            }
-
             SpawnEnemy();
         }
     }
 
-    public EnemyBase SpawnEnemy()
+    private bool ValidateSetup()
     {
         if (enemyData == null || enemyData.prefab == null)
         {
-            Debug.LogWarning($"{name}: SimpleEnemySpawner — нет корректных данных врага.");
-            return null;
+            Debug.LogWarning($"{name}: не назначены EnemyData или prefab.", this);
+            return false;
         }
 
         if (spawnPoints == null || spawnPoints.Length == 0)
         {
-            Debug.LogWarning($"{name}: SimpleEnemySpawner — нет точек спавна.");
-            return null;
+            Debug.LogWarning($"{name}: нет точек спавна.", this);
+            return false;
         }
 
-        Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
+        return true;
+    }
 
-        GameObject enemyObject = Instantiate(enemyData.prefab, spawnPoint.position, spawnPoint.rotation);
-
-        EnemyStats stats = enemyObject.GetComponent<EnemyStats>();
-        if (stats != null)
-        {
-            // Инициализируем статы из EnemyData, если это ещё не было сделано.
-            stats.Setup(enemyData);
-        }
-
-        EnemyBase enemy = enemyObject.GetComponent<EnemyBase>();
-        if (enemy != null)
-        {
-            activeEnemies.Add(enemy);
-        }
-
-        if (showDebugLogs)
-        {
-            Debug.Log($"{name}: создан враг {enemyData.enemyName} в точке {spawnPoint.name}");
-        }
-
-        return enemy;
+    private void ResolvePlayerTarget()
+    {
+        PlayerController player = FindFirstObjectByType<PlayerController>();
+        playerTarget = player != null ? player.transform : null;
     }
 
     private void CleanupInactiveEnemies()
     {
-        activeEnemies.RemoveAll(e => e == null || !e.gameObject.activeInHierarchy);
+        activeEnemies.RemoveAll(enemy => enemy == null || !enemy.gameObject.activeInHierarchy);
     }
 
     private void OnDestroy()
@@ -162,4 +177,3 @@ public class SimpleEnemySpawner : MonoBehaviour
         StopSpawning();
     }
 }
-
