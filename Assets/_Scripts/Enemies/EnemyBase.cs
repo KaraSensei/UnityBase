@@ -1,13 +1,14 @@
 ﻿/*
  * EnemyBase
  * Назначение: базовое поведение врага в runtime (цель, движение, атака, получение урона).
- * Что делает: хранит состояние здоровья экземпляра, преследует цель и выполняет простую атаку по кулдауну.
- * Связи: читает баланс из EnemyData, используется EnemySpawner и адаптером EnemyStats.
- * Паттерны: Single Responsibility (поведение врага), Data + Runtime State.
+ * Что делает: хранит runtime-состояние врага, ведёт chase/attack/dead логику и перемещается через NavMeshAgent.
+ * Связи: читает баланс из EnemyData, используется EnemySpawner/EncounterTrigger и адаптером EnemyStats.
+ * Паттерны: Single Responsibility (поведение врага), Data + Runtime State, Enum-based State Machine.
  */
 
 using System;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// Базовый класс поведения врага для simple-ветки.
@@ -48,9 +49,23 @@ public class EnemyBase : MonoBehaviour, IDamageable
     [Min(0f)]
     [SerializeField] private float destroyDelayAfterDeath = 0.15f;
 
+    [Header("Навигация")]
+    [Tooltip("Использовать ли NavMeshAgent для движения к цели.")]
+    [SerializeField] private bool useNavMeshAgent = true;
+
+    [Tooltip("Отступ, который вычитается из AttackRange для stoppingDistance NavMeshAgent.")]
+    [Min(0f)]
+    [SerializeField] private float attackStoppingOffset = 0.1f;
+
+    [Tooltip("Скорость поворота в fallback-режиме ручного движения.")]
+    [Min(0f)]
+    [SerializeField] private float manualRotationSpeed = 5f;
+
     private float nextAttackTime;
     private bool isDead;
     private EnemyState currentState = EnemyState.Chase;
+    private NavMeshAgent navMeshAgent;
+    private bool hasLoggedNavMeshFallback;
 
     public EnemyData Data => enemyData;
     public float CurrentHealth => currentHealth;
@@ -76,6 +91,9 @@ public class EnemyBase : MonoBehaviour, IDamageable
         // если EnemyData уже назначен в инспекторе на префабе.
         if (enemyData != null)
             currentHealth = enemyData.maxHealth;
+
+        TryInitializeNavMeshAgent();
+        ApplyNavigationSettings();
     }
 
     private void Start()
@@ -84,6 +102,8 @@ public class EnemyBase : MonoBehaviour, IDamageable
         // Здесь удобно делать “поиск внешнего мира”: найти игрока и выставить цель.
         if (target == null && autoResolveTargetOnStart)
             ResolveTargetOnce();
+
+        ApplyNavigationSettings();
     }
 
     private void Update()
@@ -100,11 +120,17 @@ public class EnemyBase : MonoBehaviour, IDamageable
         // Минимальный guard для завершённого боевого цикла:
         // если цель уже мертва, враг прекращает преследование и атаку.
         if (targetDamageable != null && targetDamageable.IsDead)
+        {
+            StopMovement();
             return;
+        }
 
         float distanceToTarget = Vector3.Distance(transform.position, target.position);
         if (distanceToTarget > DetectionRange)
+        {
+            StopMovement();
             return;
+        }
 
         if (distanceToTarget <= AttackRange)
             currentState = EnemyState.Attack;
@@ -114,6 +140,8 @@ public class EnemyBase : MonoBehaviour, IDamageable
         switch (currentState)
         {
             case EnemyState.Attack:
+                StopMovement();
+                FaceTarget();
                 TryAttack();
                 break;
 
@@ -134,6 +162,10 @@ public class EnemyBase : MonoBehaviour, IDamageable
         isDead = false;
         nextAttackTime = 0f;
         currentState = EnemyState.Chase;
+        hasLoggedNavMeshFallback = false;
+
+        TryInitializeNavMeshAgent();
+        ApplyNavigationSettings();
     }
 
     /// <summary>
@@ -168,6 +200,7 @@ public class EnemyBase : MonoBehaviour, IDamageable
 
         isDead = true;
         currentState = EnemyState.Dead;
+        StopMovement();
         Debug.Log($"{name}: умер.");
         OnDied?.Invoke();
 
@@ -204,17 +237,22 @@ public class EnemyBase : MonoBehaviour, IDamageable
     }
 
     /// <summary>
-    /// Простое движение к цели “вручную” (без NavMesh).
-    /// В более продвинутой версии это заменится на NavMeshAgent.
+    /// Движение к цели.
+    /// Основной путь — через NavMeshAgent; ручное движение используется как fallback.
     /// </summary>
     public void MoveTowardsTarget()
     {
         if (target == null)
             return;
 
-        // Точка расширения для advanced AI:
-        // на следующих этапах здесь планируется переход на NavMeshAgent
-        // и state-driven перемещение вместо прямой правки transform.position.
+        if (TryMoveWithNavMesh())
+            return;
+
+        MoveTowardsTargetManually();
+    }
+
+    private void MoveTowardsTargetManually()
+    {
         Vector3 direction = (target.position - transform.position).normalized;
         direction.y = 0f;
 
@@ -223,7 +261,7 @@ public class EnemyBase : MonoBehaviour, IDamageable
         if (direction != Vector3.zero)
         {
             Quaternion lookRotation = Quaternion.LookRotation(direction);
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * manualRotationSpeed);
         }
     }
 
@@ -260,6 +298,83 @@ public class EnemyBase : MonoBehaviour, IDamageable
 
         nextAttackTime = Time.time + attackCooldown;
         Attack();
+    }
+
+    private void TryInitializeNavMeshAgent()
+    {
+        if (!useNavMeshAgent)
+            return;
+
+        if (navMeshAgent == null)
+            navMeshAgent = GetComponent<NavMeshAgent>();
+
+        // Для существующих префабов в simple-ветке добавляем NavMeshAgent автоматически,
+        // чтобы не ломать урок и не требовать массового ручного перевешивания компонентов.
+        if (navMeshAgent == null)
+            navMeshAgent = gameObject.AddComponent<NavMeshAgent>();
+    }
+
+    private void ApplyNavigationSettings()
+    {
+        if (!useNavMeshAgent || navMeshAgent == null || enemyData == null)
+            return;
+
+        navMeshAgent.speed = Mathf.Max(0.01f, MoveSpeed);
+        navMeshAgent.stoppingDistance = Mathf.Max(0.1f, AttackRange - attackStoppingOffset);
+        navMeshAgent.autoBraking = true;
+    }
+
+    private bool TryMoveWithNavMesh()
+    {
+        if (!useNavMeshAgent || navMeshAgent == null || target == null)
+            return false;
+
+        // Если агент не на baked NavMesh (или поверхность не построена), не падаем:
+        // мягко переключаемся в fallback-движение.
+        if (!navMeshAgent.enabled || !navMeshAgent.isOnNavMesh)
+        {
+            if (!hasLoggedNavMeshFallback)
+            {
+                Debug.LogWarning($"{name}: NavMeshAgent недоступен/вне NavMesh. Используется fallback-движение.", this);
+                hasLoggedNavMeshFallback = true;
+            }
+
+            return false;
+        }
+
+        hasLoggedNavMeshFallback = false;
+        navMeshAgent.isStopped = false;
+        navMeshAgent.SetDestination(target.position);
+        return true;
+    }
+
+    private void StopMovement()
+    {
+        if (navMeshAgent == null || !navMeshAgent.enabled)
+            return;
+
+        if (navMeshAgent.isOnNavMesh)
+        {
+            navMeshAgent.isStopped = true;
+            if (navMeshAgent.hasPath)
+                navMeshAgent.ResetPath();
+        }
+
+        navMeshAgent.velocity = Vector3.zero;
+    }
+
+    private void FaceTarget()
+    {
+        if (target == null)
+            return;
+
+        Vector3 direction = target.position - transform.position;
+        direction.y = 0f;
+        if (direction.sqrMagnitude <= 0.0001f)
+            return;
+
+        Quaternion lookRotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * manualRotationSpeed);
     }
 
     private void OnDrawGizmosSelected()

@@ -56,6 +56,11 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Доступ к точкам спавна для систем encounter.
+    /// </summary>
+    public IReadOnlyList<Transform> SpawnPoints => spawnPoints;
+
     private void Start()
     {
         ResolvePlayerTarget();
@@ -89,10 +94,31 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Спавн врага случайного типа в случайной точке.
+    /// Используется текущим simple-спавном (урок 3).
+    /// </summary>
     public EnemyBase SpawnEnemy()
     {
         if (!HasSpawnData())
             return null;
+
+        EnemyData selectedData = PickRandomEnemyData();
+        Transform randomPoint = GetRandomSpawnPoint();
+        return SpawnEnemy(selectedData, randomPoint, null);
+    }
+
+    /// <summary>
+    /// Спавн врага конкретного типа в указанной точке.
+    /// Используется encounter/wave-системой (урок 4).
+    /// </summary>
+    public EnemyBase SpawnEnemy(EnemyData data, Transform spawnPointOverride, Transform targetOverride = null)
+    {
+        if (data == null || data.prefab == null)
+        {
+            Debug.LogWarning($"{name}: SpawnEnemy получил невалидный EnemyData.", this);
+            return null;
+        }
 
         CleanupInactiveEnemies();
         if (activeEnemies.Count >= maxEnemies)
@@ -102,28 +128,37 @@ public class EnemySpawner : MonoBehaviour
             return null;
         }
 
-        Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
-        EnemyData selectedData = PickRandomEnemyData();
-        if (spawnPoint == null || selectedData == null || selectedData.prefab == null)
+        Transform spawnPoint = spawnPointOverride != null ? spawnPointOverride : GetRandomSpawnPoint();
+        if (spawnPoint == null)
+        {
+            Debug.LogWarning($"{name}: не найдена валидная точка спавна.", this);
             return null;
+        }
+
+        if (playerTarget == null)
+            ResolvePlayerTarget();
 
         // В simple-ветке спавн выполняется напрямую через Instantiate.
-        GameObject enemyObject = Instantiate(selectedData.prefab, spawnPoint.position, spawnPoint.rotation);
+        GameObject enemyObject = Instantiate(data.prefab, spawnPoint.position, spawnPoint.rotation);
         EnemyBase enemy = enemyObject.GetComponent<EnemyBase>();
 
         if (enemy == null)
         {
-            Debug.LogError($"{name}: у префаба {selectedData.prefab.name} отсутствует EnemyBase.", this);
+            Debug.LogError($"{name}: у префаба {data.prefab.name} отсутствует EnemyBase.", this);
             Destroy(enemyObject);
             return null;
         }
 
-        enemy.Setup(selectedData);
-        enemy.SetTarget(playerTarget);
+        enemy.Setup(data);
+
+        Transform target = targetOverride != null ? targetOverride : playerTarget;
+        if (target != null)
+            enemy.SetTarget(target);
+
         activeEnemies.Add(enemy);
 
         if (showDebugLogs)
-            Debug.Log($"{name}: создан враг {selectedData.enemyName} в точке {spawnPoint.name}");
+            Debug.Log($"{name}: создан враг {data.enemyName} в точке {spawnPoint.name}");
 
         return enemy;
     }
@@ -194,6 +229,29 @@ public class EnemySpawner : MonoBehaviour
             return null;
 
         return validData[Random.Range(0, validData.Count)];
+    }
+
+    private Transform GetRandomSpawnPoint()
+    {
+        if (spawnPoints == null || spawnPoints.Length == 0)
+            return null;
+
+        List<Transform> validPoints = null;
+        for (int i = 0; i < spawnPoints.Length; i++)
+        {
+            if (spawnPoints[i] == null)
+                continue;
+
+            if (validPoints == null)
+                validPoints = new List<Transform>();
+
+            validPoints.Add(spawnPoints[i]);
+        }
+
+        if (validPoints == null || validPoints.Count == 0)
+            return null;
+
+        return validPoints[Random.Range(0, validPoints.Count)];
     }
 
     private void CleanupInactiveEnemies()
