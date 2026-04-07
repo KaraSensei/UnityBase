@@ -2,7 +2,7 @@
  * EncounterTrigger
  * Назначение: запуск и управление encounter при входе игрока в trigger.
  * Что делает: запускает волны из EncounterData, отслеживает живых врагов и завершает encounter только после их добивания.
- * Связи: использует EncounterData/WaveData и EnemySpawner.
+ * Связи: использует EncounterData/WaveData и спавнер (EnemySpawner, либо SimpleEnemySpawner как учебный fallback).
  * Паттерны: Trigger-driven flow, локальная state-машина, event-based декуплинг.
  */
 
@@ -22,13 +22,16 @@ public class EncounterTrigger : MonoBehaviour
     [SerializeField] private EncounterData encounterData;
 
     [Header("Связи")]
-    [Tooltip("Спавнер, через который создаются враги encounter.")]
+    [Tooltip("Основной спавнер для encounter/wave-системы (каноничный вариант урока 7.4).")]
     [SerializeField] private EnemySpawner enemySpawner;
+
+    [Tooltip("Упрощённый fallback-спавнер. Используется только если EnemySpawner не найден/не назначен.")]
+    [SerializeField] private SimpleEnemySpawner simpleEnemySpawner;
 
     [Tooltip("Опциональный override цели врагов. Если пусто, ищется PlayerController на сцене.")]
     [SerializeField] private Transform playerTargetOverride;
 
-    [Tooltip("Опциональные точки спавна конкретно для этого encounter. Если пусто, используются точки EnemySpawner.")]
+    [Tooltip("Опциональные точки спавна конкретно для этого encounter. Если пусто, используются точки спавнера.")]
     [SerializeField] private Transform[] encounterSpawnPoints;
 
     [Header("Триггер")]
@@ -70,6 +73,9 @@ public class EncounterTrigger : MonoBehaviour
     public bool IsEncounterRunning => isEncounterRunning;
     public bool IsEncounterCompleted => isEncounterCompleted;
 
+    private bool HasEnemySpawner => enemySpawner != null;
+    private bool HasSimpleSpawner => simpleEnemySpawner != null;
+
     private void Awake()
     {
         triggerCollider = GetComponent<Collider>();
@@ -78,6 +84,18 @@ public class EncounterTrigger : MonoBehaviour
 
         if (enemySpawner == null)
             enemySpawner = FindFirstObjectByType<EnemySpawner>();
+
+        // Friendly fallback для учеников: если основной спавнер не найден,
+        // пробуем упрощённый SimpleEnemySpawner вместо немой поломки encounter.
+        if (enemySpawner == null && simpleEnemySpawner == null)
+            simpleEnemySpawner = FindFirstObjectByType<SimpleEnemySpawner>();
+
+        if (enemySpawner == null && simpleEnemySpawner != null)
+        {
+            Debug.LogWarning(
+                $"{name}: EnemySpawner не найден. Encounter будет использовать SimpleEnemySpawner как fallback. " +
+                "Для каноничного варианта урока 7.4 рекомендуется назначить EnemySpawner.", this);
+        }
     }
 
     private void OnDisable()
@@ -200,12 +218,19 @@ public class EncounterTrigger : MonoBehaviour
 
     private EnemyBase SpawnWaveEnemy(WaveData wave)
     {
-        if (enemySpawner == null || wave == null || !wave.IsValid)
+        if (wave == null || !wave.IsValid)
             return null;
 
         Transform spawnPoint = ResolveSpawnPoint();
         Transform target = ResolvePlayerTarget();
-        return enemySpawner.SpawnEnemy(wave.EnemyData, spawnPoint, target);
+
+        if (HasEnemySpawner)
+            return enemySpawner.SpawnEnemy(wave.EnemyData, spawnPoint, target);
+
+        if (HasSimpleSpawner)
+            return simpleEnemySpawner.SpawnEnemyForEncounter(wave.EnemyData, spawnPoint, target);
+
+        return null;
     }
 
     private Transform ResolveSpawnPoint()
@@ -213,22 +238,40 @@ public class EncounterTrigger : MonoBehaviour
         if (encounterSpawnPoints != null && encounterSpawnPoints.Length > 0)
             return PickRandomValidPoint(encounterSpawnPoints);
 
-        IReadOnlyList<Transform> spawnerPoints = enemySpawner != null ? enemySpawner.SpawnPoints : null;
+        List<Transform> spawnerPoints = GetSpawnerPoints();
         if (spawnerPoints == null || spawnerPoints.Count == 0)
             return null;
 
+        return spawnerPoints[UnityEngine.Random.Range(0, spawnerPoints.Count)];
+    }
+
+    private List<Transform> GetSpawnerPoints()
+    {
         List<Transform> validPoints = new List<Transform>();
-        for (int i = 0; i < spawnerPoints.Count; i++)
+
+        if (HasEnemySpawner)
         {
-            Transform point = spawnerPoints[i];
-            if (point != null)
-                validPoints.Add(point);
+            IReadOnlyList<Transform> points = enemySpawner.SpawnPoints;
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (points[i] != null)
+                    validPoints.Add(points[i]);
+            }
+
+            return validPoints;
         }
 
-        if (validPoints.Count == 0)
-            return null;
+        if (HasSimpleSpawner)
+        {
+            IReadOnlyList<Transform> points = simpleEnemySpawner.SpawnPoints;
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (points[i] != null)
+                    validPoints.Add(points[i]);
+            }
+        }
 
-        return validPoints[UnityEngine.Random.Range(0, validPoints.Count)];
+        return validPoints;
     }
 
     private static Transform PickRandomValidPoint(Transform[] points)
@@ -381,17 +424,19 @@ public class EncounterTrigger : MonoBehaviour
             return false;
         }
 
-        if (enemySpawner == null)
+        if (!HasEnemySpawner && !HasSimpleSpawner)
         {
-            Debug.LogError($"{name}: EnemySpawner не назначен.", this);
+            Debug.LogError(
+                $"{name}: не найден спавнер для encounter. " +
+                "Назначьте EnemySpawner (канонично) или добавьте SimpleEnemySpawner как fallback.", this);
             return false;
         }
 
         bool hasOwnPoints = encounterSpawnPoints != null && encounterSpawnPoints.Length > 0;
-        bool hasSpawnerPoints = enemySpawner.SpawnPoints != null && enemySpawner.SpawnPoints.Count > 0;
+        bool hasSpawnerPoints = GetSpawnerPoints().Count > 0;
         if (!hasOwnPoints && !hasSpawnerPoints)
         {
-            Debug.LogError($"{name}: нет ни encounterSpawnPoints, ни точек в EnemySpawner.", this);
+            Debug.LogError($"{name}: нет ни encounterSpawnPoints, ни валидных точек в спавнере.", this);
             return false;
         }
 

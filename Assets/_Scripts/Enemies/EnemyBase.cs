@@ -66,6 +66,7 @@ public class EnemyBase : MonoBehaviour, IDamageable
     private EnemyState currentState = EnemyState.Chase;
     private NavMeshAgent navMeshAgent;
     private bool hasLoggedNavMeshFallback;
+    private bool isNavMeshAgentAutoAdded;
 
     public EnemyData Data => enemyData;
     public float CurrentHealth => currentHealth;
@@ -311,7 +312,11 @@ public class EnemyBase : MonoBehaviour, IDamageable
         // Для существующих префабов в simple-ветке добавляем NavMeshAgent автоматически,
         // чтобы не ломать урок и не требовать массового ручного перевешивания компонентов.
         if (navMeshAgent == null)
+        {
             navMeshAgent = gameObject.AddComponent<NavMeshAgent>();
+            isNavMeshAgentAutoAdded = true;
+            ApplyAutoAddedAgentDefaults();
+        }
     }
 
     private void ApplyNavigationSettings()
@@ -321,6 +326,8 @@ public class EnemyBase : MonoBehaviour, IDamageable
 
         navMeshAgent.speed = Mathf.Max(0.01f, MoveSpeed);
         navMeshAgent.stoppingDistance = Mathf.Max(0.1f, AttackRange - attackStoppingOffset);
+        navMeshAgent.acceleration = Mathf.Max(8f, navMeshAgent.acceleration);
+        navMeshAgent.angularSpeed = Mathf.Max(360f, navMeshAgent.angularSpeed);
         navMeshAgent.autoBraking = true;
     }
 
@@ -335,7 +342,10 @@ public class EnemyBase : MonoBehaviour, IDamageable
         {
             if (!hasLoggedNavMeshFallback)
             {
-                Debug.LogWarning($"{name}: NavMeshAgent недоступен/вне NavMesh. Используется fallback-движение.", this);
+                Debug.LogWarning(
+                    $"{name}: NavMeshAgent недоступен/вне NavMesh. " +
+                    "Используется fallback-движение. Проверьте Bake NavMesh, активность NavMeshSurface и позицию врага на NavMesh.",
+                    this);
                 hasLoggedNavMeshFallback = true;
             }
 
@@ -375,6 +385,28 @@ public class EnemyBase : MonoBehaviour, IDamageable
 
         Quaternion lookRotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
         transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * manualRotationSpeed);
+    }
+
+    private void ApplyAutoAddedAgentDefaults()
+    {
+        if (navMeshAgent == null || !isNavMeshAgentAutoAdded)
+            return;
+
+        // Учебные безопасные дефолты, чтобы автодобавленный агент не вел себя хаотично.
+        navMeshAgent.radius = 0.35f;
+        navMeshAgent.height = 1.8f;
+        navMeshAgent.baseOffset = 0f;
+        navMeshAgent.acceleration = 16f;
+        navMeshAgent.angularSpeed = 540f;
+        navMeshAgent.autoBraking = true;
+
+        CapsuleCollider capsule = GetComponent<CapsuleCollider>();
+        if (capsule != null)
+        {
+            navMeshAgent.radius = Mathf.Max(0.2f, capsule.radius * 0.6f);
+            navMeshAgent.height = Mathf.Max(1f, capsule.height);
+            navMeshAgent.baseOffset = capsule.center.y;
+        }
     }
 
     private void OnDrawGizmosSelected()

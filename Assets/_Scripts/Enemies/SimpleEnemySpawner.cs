@@ -1,9 +1,14 @@
-/*
+﻿/*
  * SimpleEnemySpawner
- * Назначение: учебный спавнер врагов через Instantiate для simple-ветки.
- * Что делает: создаёт врагов в случайных spawn points, держит лимит активных и управляет циклом спавна.
- * Связи: использует EnemyData/EnemyBase, при наличии назначает цель через PlayerController.
+ * Назначение: максимально упрощённый спавнер для ранних шагов обучения (Instantiate + лимит активных врагов).
+ * Что делает: спавнит один выбранный тип врага в случайных точках и управляет простым циклом auto-spawn.
+ * Связи: использует EnemyData/EnemyBase; может работать как fallback для EncounterTrigger в учебном режиме.
  * Паттерны: Composition, Fail Fast, Local Validation.
+ *
+ * Контракт для уроков:
+ *  - Это облегчённый вариант, чтобы ученики быстрее освоили основы спавна.
+ *  - Основной канон для encounter/wave слоя в teacher repo — EnemySpawner.
+ *  - EncounterTrigger может использовать этот компонент как fallback, чтобы ученик не получал "молчаливую" поломку.
  */
 
 using System.Collections;
@@ -11,12 +16,12 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Упрощённый спавнер врагов для базового обучения без pooling/factory.
+/// Упрощённый спавнер врагов для базовых уроков без pooling/factory.
 /// </summary>
 public class SimpleEnemySpawner : MonoBehaviour
 {
     [Header("Тип врага")]
-    [Tooltip("Данные врага, которого будем спавнить.")]
+    [Tooltip("Данные врага, которого будем спавнить в упрощённом режиме.")]
     [SerializeField] private EnemyData enemyData;
 
     [Header("Точки спавна")]
@@ -44,6 +49,11 @@ public class SimpleEnemySpawner : MonoBehaviour
     private Transform playerTarget;
     private readonly List<EnemyBase> activeEnemies = new List<EnemyBase>();
 
+    /// <summary>
+    /// Точки спавна (read-only) для внешних систем, например EncounterTrigger fallback.
+    /// </summary>
+    public IReadOnlyList<Transform> SpawnPoints => spawnPoints;
+
     private void Start()
     {
         ResolvePlayerTarget();
@@ -55,6 +65,10 @@ public class SimpleEnemySpawner : MonoBehaviour
             StartSpawning();
     }
 
+    /// <summary>
+    /// Запускает периодический auto-spawn.
+    /// Это учебный базовый цикл, не wave/encounter оркестратор.
+    /// </summary>
     public void StartSpawning()
     {
         if (isSpawning)
@@ -71,6 +85,9 @@ public class SimpleEnemySpawner : MonoBehaviour
             Debug.Log($"{name}: спавн врагов запущен.", this);
     }
 
+    /// <summary>
+    /// Останавливает периодический auto-spawn.
+    /// </summary>
     public void StopSpawning()
     {
         if (!isSpawning)
@@ -91,6 +108,9 @@ public class SimpleEnemySpawner : MonoBehaviour
             Debug.Log($"{name}: спавн врагов остановлен.", this);
     }
 
+    /// <summary>
+    /// Спавнит врага из локального enemyData в случайной точке.
+    /// </summary>
     public EnemyBase SpawnEnemy()
     {
         if (!ValidateSetup())
@@ -98,6 +118,46 @@ public class SimpleEnemySpawner : MonoBehaviour
 
         if (playerTarget == null)
             ResolvePlayerTarget();
+
+        return SpawnInternal(enemyData, GetRandomSpawnPoint(), playerTarget);
+    }
+
+    /// <summary>
+    /// Fallback-метод для encounter-системы.
+    /// Позволяет EncounterTrigger заспавнить конкретный EnemyData, если в сцене нет EnemySpawner.
+    /// </summary>
+    public EnemyBase SpawnEnemyForEncounter(EnemyData overrideData, Transform spawnPointOverride, Transform targetOverride)
+    {
+        EnemyData dataToSpawn = overrideData != null ? overrideData : enemyData;
+        if (dataToSpawn == null || dataToSpawn.prefab == null)
+        {
+            Debug.LogError($"{name}: encounter fallback не может заспавнить врага — невалидный EnemyData.", this);
+            return null;
+        }
+
+        if (showDebugLogs)
+        {
+            Debug.LogWarning(
+                $"{name}: encounter использует SimpleEnemySpawner как fallback. " +
+                "Для каноничного сценария урока 7.4 рекомендуется EnemySpawner.", this);
+        }
+
+        Transform spawnPoint = spawnPointOverride != null ? spawnPointOverride : GetRandomSpawnPoint();
+        Transform target = targetOverride != null ? targetOverride : playerTarget;
+
+        if (target == null)
+        {
+            ResolvePlayerTarget();
+            target = playerTarget;
+        }
+
+        return SpawnInternal(dataToSpawn, spawnPoint, target);
+    }
+
+    private EnemyBase SpawnInternal(EnemyData data, Transform spawnPoint, Transform target)
+    {
+        if (data == null || data.prefab == null)
+            return null;
 
         CleanupInactiveEnemies();
         if (activeEnemies.Count >= maxEnemies)
@@ -107,30 +167,29 @@ public class SimpleEnemySpawner : MonoBehaviour
             return null;
         }
 
-        Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
         if (spawnPoint == null)
         {
-            Debug.LogWarning($"{name}: одна из spawn points не назначена.", this);
+            Debug.LogWarning($"{name}: не найдена валидная точка спавна.", this);
             return null;
         }
 
-        GameObject enemyObject = Instantiate(enemyData.prefab, spawnPoint.position, spawnPoint.rotation);
+        GameObject enemyObject = Instantiate(data.prefab, spawnPoint.position, spawnPoint.rotation);
         EnemyBase enemy = enemyObject.GetComponent<EnemyBase>();
         if (enemy == null)
         {
-            Debug.LogError($"{name}: на префабе {enemyData.prefab.name} отсутствует EnemyBase.", this);
+            Debug.LogError($"{name}: на префабе {data.prefab.name} отсутствует EnemyBase.", this);
             Destroy(enemyObject);
             return null;
         }
 
-        enemy.Setup(enemyData);
-        if (playerTarget != null)
-            enemy.SetTarget(playerTarget);
+        enemy.Setup(data);
+        if (target != null)
+            enemy.SetTarget(target);
 
         activeEnemies.Add(enemy);
 
         if (showDebugLogs)
-            Debug.Log($"{name}: создан враг {enemyData.enemyName} в точке {spawnPoint.name}.", this);
+            Debug.Log($"{name}: создан враг {data.enemyName} в точке {spawnPoint.name}.", this);
 
         return enemy;
     }
@@ -165,6 +224,24 @@ public class SimpleEnemySpawner : MonoBehaviour
     {
         PlayerController player = FindFirstObjectByType<PlayerController>();
         playerTarget = player != null ? player.transform : null;
+    }
+
+    private Transform GetRandomSpawnPoint()
+    {
+        if (spawnPoints == null || spawnPoints.Length == 0)
+            return null;
+
+        List<Transform> validPoints = new List<Transform>();
+        for (int i = 0; i < spawnPoints.Length; i++)
+        {
+            if (spawnPoints[i] != null)
+                validPoints.Add(spawnPoints[i]);
+        }
+
+        if (validPoints.Count == 0)
+            return null;
+
+        return validPoints[Random.Range(0, validPoints.Count)];
     }
 
     private void CleanupInactiveEnemies()
