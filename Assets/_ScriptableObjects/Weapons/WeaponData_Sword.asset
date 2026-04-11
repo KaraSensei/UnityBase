@@ -15,10 +15,11 @@ MonoBehaviour:
   weaponName: Sword
   weaponType: 0
   icon: {fileID: 0}
-  damage: 20
+  damage: 100
   attackSpeed: 1.2
   range: 2
   knockbackForce: 0
   attackAnimationName: 
   attackSound: {fileID: 0}
   projectilePrefab: {fileID: 0}
+  projectileSpeed: 20

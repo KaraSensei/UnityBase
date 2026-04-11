@@ -2,45 +2,51 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Управляет оружием игрока (вариант B: все оружия — дочерние объекты, смена через Enable/Disable):
-/// - хранит экземпляры оружия из префаба игрока;
-/// - листает только «доступные» оружия (список availableWeapons);
-/// - переключение по кнопкам 1 (назад) и 2 (вперёд) через InputManager.
+/// Назначение: управляет доступными оружиями игрока и переключением между ними.
+/// Что делает: хранит экземпляры оружия на префабе игрока, включает нужный слот и передаёт выполнение атаки текущему оружию.
+/// Связи: работает вместе с PlayerStats и PlayerCombatController. Сам больше не решает, в какой кадр должна произойти атака.
+/// Паттерны: Single Responsibility, композиция оружий через дочерние объекты.
 /// </summary>
 public class WeaponManager : MonoBehaviour
 {
     [Header("Связи")]
-    [SerializeField]
-    [Tooltip("Статы игрока (могут понадобиться для модификаторов урона, критов и т.п.).")]
-    private PlayerStats playerStats;
+    [Tooltip("Статы игрока. Нужны для проверки смерти и будущих модификаторов урона.")]
+    [SerializeField] private PlayerStats playerStats;
+
+    [Tooltip("Боевой контроллер игрока. Он запускает анимацию и ждёт Animation Event.")]
+    [SerializeField] private PlayerCombatController playerCombatController;
 
     [Header("Оружия на игроке")]
-    [SerializeField]
-    [Tooltip("Все экземпляры оружия — дочерние объекты игрока. Порядок = порядок слотов. Назначаются в инспекторе.")]
-    private WeaponBase[] weaponInstances;
+    [Tooltip("Все экземпляры оружия — дочерние объекты игрока. Порядок в массиве = порядок слотов.")]
+    [SerializeField] private WeaponBase[] weaponInstances;
 
-    [SerializeField]
-    [Tooltip("Какие слоты доступны для переключения при старте (по индексу в Weapon Instances). Если короче массива — остальные считаются доступными.")]
-    private bool[] weaponAvailableAtStart;
+    [Tooltip("Какие слоты доступны при старте. Если массив короче weaponInstances, остальные считаются доступными.")]
+    [SerializeField] private bool[] weaponAvailableAtStart;
 
-    [SerializeField]
-    [Tooltip("Индекс в списке доступных оружий, которое экипируется при старте (0 = первое доступное).")]
-    private int defaultWeaponIndexInAvailable = 0;
+    [Tooltip("Индекс стартового оружия внутри списка доступных оружий.")]
+    [SerializeField] private int defaultWeaponIndexInAvailable = 0;
 
-    private List<WeaponBase> availableWeapons = new List<WeaponBase>();
+    private readonly List<WeaponBase> availableWeapons = new List<WeaponBase>();
     private int currentAvailableIndex;
     private WeaponBase currentWeapon;
 
-    /// <summary> Текущее активное оружие игрока (только чтение). </summary>
+    /// <summary>
+    /// Текущее активное оружие игрока.
+    /// </summary>
     public WeaponBase CurrentWeapon => currentWeapon;
 
-    /// <summary> Статы игрока (для модификаторов урона и т.п.). </summary>
+    /// <summary>
+    /// Статы игрока.
+    /// </summary>
     public PlayerStats PlayerStats => playerStats;
 
     private void Awake()
     {
         if (playerStats == null)
             playerStats = GetComponent<PlayerStats>();
+
+        if (playerCombatController == null)
+            playerCombatController = GetComponent<PlayerCombatController>();
 
         BuildAvailableWeaponsList();
         if (availableWeapons.Count == 0)
@@ -49,9 +55,6 @@ public class WeaponManager : MonoBehaviour
             return;
         }
 
-        // Защищаемся от выхода за границы: если в инспекторе задали индекс стартового оружия
-        // меньше 0 или больше/равно числу доступных оружий, Mathf.Clamp "прижмёт" его
-        // в диапазон [0, availableWeapons.Count - 1].
         int startIndex = Mathf.Clamp(defaultWeaponIndexInAvailable, 0, availableWeapons.Count - 1);
         currentAvailableIndex = startIndex;
         EquipByEnableDisable(availableWeapons[startIndex]);
@@ -78,42 +81,42 @@ public class WeaponManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Строит список доступных оружий из weaponInstances по флагам weaponAvailableAtStart.
+    /// Строит список доступных оружий по флагам weaponAvailableAtStart.
     /// </summary>
     private void BuildAvailableWeaponsList()
     {
         availableWeapons.Clear();
-        if (weaponInstances == null) return;
+        if (weaponInstances == null)
+            return;
 
         for (int i = 0; i < weaponInstances.Length; i++)
         {
-            if (weaponInstances[i] == null) continue;
+            if (weaponInstances[i] == null)
+                continue;
 
-            // Логика флага доступности:
-            // - если weaponAvailableAtStart == null, то считаем, что ВСЕ слоты доступны;
-            // - если индекс i вышел за длину weaponAvailableAtStart, тоже считаем слот доступным;
-            // - иначе берём конкретное значение weaponAvailableAtStart[i].
-            bool available = weaponAvailableAtStart == null || i >= weaponAvailableAtStart.Length || weaponAvailableAtStart[i];
+            bool available = weaponAvailableAtStart == null ||
+                             i >= weaponAvailableAtStart.Length ||
+                             weaponAvailableAtStart[i];
+
             if (available)
                 availableWeapons.Add(weaponInstances[i]);
         }
     }
 
     /// <summary>
-    /// Включить только выбранное оружие, остальные выключить.
+    /// Включает только выбранное оружие, остальные выключает.
     /// </summary>
     private void EquipByEnableDisable(WeaponBase weapon)
     {
-        if (weapon == null) return;
+        if (weapon == null)
+            return;
 
         if (weaponInstances != null)
         {
-            // Проходим по всем оружиям-слотам и включаем только то, которое выбрали,
-            // а остальные принудительно выключаем.
-            foreach (WeaponBase w in weaponInstances)
+            foreach (WeaponBase weaponInstance in weaponInstances)
             {
-                if (w != null)
-                    w.gameObject.SetActive(w == weapon);
+                if (weaponInstance != null)
+                    weaponInstance.gameObject.SetActive(weaponInstance == weapon);
             }
         }
 
@@ -122,26 +125,25 @@ public class WeaponManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Переключиться на следующее оружие в списке доступных (кнопка 2).
+    /// Переключает на следующее доступное оружие.
     /// </summary>
     private void SwitchToNextWeapon()
     {
-        if (availableWeapons.Count == 0) return;
+        if (availableWeapons.Count == 0)
+            return;
+
         currentAvailableIndex = (currentAvailableIndex + 1) % availableWeapons.Count;
         EquipByEnableDisable(availableWeapons[currentAvailableIndex]);
     }
 
     /// <summary>
-    /// Переключиться на предыдущее оружие в списке доступных (кнопка 1).
+    /// Переключает на предыдущее доступное оружие.
     /// </summary>
     private void SwitchToPrevWeapon()
     {
-        if (availableWeapons.Count == 0) return;
-        // (currentAvailableIndex - 1 + availableWeapons.Count) % availableWeapons.Count
-        // даёт нам "круговой" индекс:
-        // - вычитаем 1 (листание назад),
-        // - добавляем Count, чтобы не уйти в отрицательные числа,
-        // - берём % Count, чтобы зациклиться от 0 к последнему и обратно.
+        if (availableWeapons.Count == 0)
+            return;
+
         currentAvailableIndex = (currentAvailableIndex - 1 + availableWeapons.Count) % availableWeapons.Count;
         EquipByEnableDisable(availableWeapons[currentAvailableIndex]);
     }
@@ -151,39 +153,63 @@ public class WeaponManager : MonoBehaviour
         if (playerStats != null && playerStats.IsDead)
             return;
 
-        if (currentWeapon == null)
+        if (playerCombatController == null)
         {
-            Debug.LogWarning("WeaponManager: у игрока нет текущего оружия, атаковать нечем.");
+            Debug.LogWarning("WeaponManager: не найден PlayerCombatController, атаку нельзя синхронизировать через Animator.", this);
             return;
         }
+
+        if (currentWeapon == null)
+        {
+            Debug.LogWarning("WeaponManager: у игрока нет текущего оружия, атаковать нечем.", this);
+            return;
+        }
+
+        playerCombatController.TryStartAttack();
+    }
+
+    /// <summary>
+    /// Выполняет действие текущего оружия в точке синхронизации из Animation Event.
+    /// Для melee это удар, для ranged — выстрел или спавн projectile.
+    /// </summary>
+    public void PerformCurrentWeaponAttack()
+    {
+        if (playerStats != null && playerStats.IsDead)
+            return;
+
+        if (currentWeapon == null)
+        {
+            Debug.LogWarning("WeaponManager: нет активного оружия для выполнения атаки через Animation Event.", this);
+            return;
+        }
+
         currentWeapon.Attack();
     }
 
     /// <summary>
-    /// Разблокировать оружие по индексу в weaponInstances (добавить в список доступных для переключения).
+    /// Разблокирует оружие по индексу слота в weaponInstances.
     /// </summary>
     public void UnlockWeaponBySlotIndex(int slotIndex)
     {
-        // Проверяем границы индекса слота и сам массив weaponInstances, чтобы не словить исключения.
-        if (weaponInstances == null || slotIndex < 0 || slotIndex >= weaponInstances.Length) return;
-        WeaponBase w = weaponInstances[slotIndex];
-        if (w != null && !availableWeapons.Contains(w))
-            availableWeapons.Add(w);
+        if (weaponInstances == null || slotIndex < 0 || slotIndex >= weaponInstances.Length)
+            return;
+
+        WeaponBase weapon = weaponInstances[slotIndex];
+        if (weapon != null && !availableWeapons.Contains(weapon))
+            availableWeapons.Add(weapon);
     }
 
-    // На будущее: сейчас оружие просто привязывается к transform игрока.
-    // Позже можно:
-    // 1) добавить в инспекторе поле handBone (Transform) и вешать оружие на конкретную кость/сокет руки;
-    // 2) или получать кость из Animator через GetBoneTransform(HumanBodyBones.RightHand/LeftHand)
-    //    и делать parent = этой кости, чтобы оружие точно следовало за анимацией руки.
+    /// <summary>
+    /// Настраивает владельца и локальное положение оружия после экипировки.
+    /// </summary>
     private void SetupWeapon(WeaponBase weapon)
     {
-        if (weapon == null) return;
-        // Сохраняем ссылку на владельца (обычно это игрок), чтобы оружие знало,
-        // от кого «летят» пули/урон.
+        if (weapon == null)
+            return;
+
+        // Пока оружие привязано к текущей иерархии игрока.
+        // Позже сюда можно добавить более точную привязку к кости руки через Animator/GetBoneTransform.
         weapon.Owner = transform;
-        // Привязываем оружие к локальному нулю и нулевой ротации относительно игрока,
-        // чтобы оно занимало правильное положение в руке/точке крепления.
         weapon.transform.localPosition = Vector3.zero;
         weapon.transform.localRotation = Quaternion.identity;
     }

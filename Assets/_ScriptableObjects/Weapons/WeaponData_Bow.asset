@@ -15,10 +15,11 @@ MonoBehaviour:
   weaponName: Bow
   weaponType: 1
   icon: {fileID: 0}
-  damage: 15
+  damage: 100
   attackSpeed: 1
   range: 12
   knockbackForce: 0
   attackAnimationName: 
   attackSound: {fileID: 0}
   projectilePrefab: {fileID: 3081234000597191149, guid: 54770955d7db26445821108d1df566d6, type: 3}
+  projectileSpeed: 20
