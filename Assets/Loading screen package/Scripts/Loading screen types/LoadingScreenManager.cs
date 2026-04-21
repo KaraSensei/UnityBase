@@ -1,15 +1,28 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class LoadingScreenManager : MonoBehaviour
 {
     private Animator _animatorComponent;
+    private DemoSceneManager _demoSceneManager;
+
+    [SerializeField] private bool hideOnStart = false;
+    [SerializeField] private bool revealOnStart = true;
 
     private void Start()
     {
-        _animatorComponent = transform.GetComponent<Animator>();  
+        _animatorComponent = transform.GetComponent<Animator>();
+        _demoSceneManager = transform.parent != null ? transform.parent.GetComponent<DemoSceneManager>() : null;
 
-        // Remove it if you don't want to hide it in the Start function and call it elsewhere
-        HideLoadingScreen();
+        if (_animatorComponent != null && revealOnStart)
+        {
+            _animatorComponent.ResetTrigger("Hide");
+            _animatorComponent.SetTrigger("Reveal");
+        }
+
+        if (hideOnStart)
+        {
+            HideLoadingScreen();
+        }
     }
 
     public void RevealLoadingScreen()
@@ -25,14 +38,17 @@ public class LoadingScreenManager : MonoBehaviour
 
     public void OnFinishedReveal()
     {
-        // TODO: remove it and load your own scene !!
-        transform.parent.GetComponent<DemoSceneManager>().OnLoadingScreenRevealed();
+        if (_demoSceneManager != null)
+        {
+            _demoSceneManager.OnLoadingScreenRevealed();
+        }
     }
 
     public void OnFinishedHide()
     {
-        // TODO: remove it and call your functions 
-        transform.parent.GetComponent<DemoSceneManager>().OnLoadingScreenHided();
+        if (_demoSceneManager != null)
+        {
+            _demoSceneManager.OnLoadingScreenHided();
+        }
     }
-
 }

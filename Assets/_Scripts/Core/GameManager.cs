@@ -46,7 +46,7 @@ public class GameManager : MonoBehaviour
     {
         CurrentState = GameState.Playing;
         Time.timeScale = 1f;
-        SceneLoader.Instance.Load(SceneNames.GameScene);
+        SceneLoader.Instance.LoadWithLoading(SceneNames.GameScene);
         Debug.Log("Game started");
         if (InputManager.Instance != null)
             InputManager.Instance.EnablePlayerInput();
