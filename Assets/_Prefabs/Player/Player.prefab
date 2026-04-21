@@ -299,7 +299,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1026502668610600348, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1377352043117115595, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
       propertyPath: owner
@@ -307,15 +307,35 @@ PrefabInstance:
       objectReference: {fileID: 4824027781513152927}
     - target: {fileID: 2066274580803365431, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0
+      value: 0.031
       objectReference: {fileID: 0}
     - target: {fileID: 2066274580803365431, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.535
+      value: 0.521
       objectReference: {fileID: 0}
     - target: {fileID: 2066274580803365431, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.063
+      value: -0.013
+      objectReference: {fileID: 0}
+    - target: {fileID: 2066274580803365431, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7895161
+      objectReference: {fileID: 0}
+    - target: {fileID: 2066274580803365431, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.00000008940697
+      objectReference: {fileID: 0}
+    - target: {fileID: 2066274580803365431, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.6137299
+      objectReference: {fileID: 0}
+    - target: {fileID: 2066274580803365431, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.000000059604645
+      objectReference: {fileID: 0}
+    - target: {fileID: 2066274580803365431, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 75.719
       objectReference: {fileID: 0}
     - target: {fileID: 2477966528341046398, guid: 55179aeb7d08fd248859ae5bc28d9994, type: 3}
       propertyPath: m_Layer
@@ -456,7 +476,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3830820603317683264, guid: 85e538bc49c5d584ea3f797cd137be8b, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5750703084544697671, guid: 85e538bc49c5d584ea3f797cd137be8b, type: 3}
       propertyPath: m_Layer
