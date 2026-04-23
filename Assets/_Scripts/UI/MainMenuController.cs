@@ -13,11 +13,9 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private Button buttonNewGame;
     [SerializeField] private Button buttonExit;
 
-/// <summary>
-/// Привязывает обработчики кликов к кнопкам меню.
-/// </summary>
-
-
+    /// <summary>
+    /// Привязывает обработчики кликов к кнопкам меню.
+    /// </summary>
     private void Start()
     {
         // Подключаем кнопки через код (связь UI → GameManager).
