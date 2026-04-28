@@ -25,18 +25,20 @@ public class GameLoopFlowController : MonoBehaviour
     [SerializeField] private bool showDebugLogs = true;
 
     private PlayerStats playerStats;
-
     private bool flowFinished;
-    private bool initialized;
-    private bool isSubscribedToDeath;
-    private bool isUiSetupValid;
 
     public event Action OnNextWaveRequested;
 
+    private void Awake()
+    {
+        ResolvePlayerStats();
+        ValidateReferences();
+        HideAllScreens();
+    }
+
     private void OnEnable()
     {
-        InitializeIfNeeded();
-        TrySubscribeToPlayerDeath();
+        SubscribeToPlayerDeath();
         BindButtons();
     }
 
@@ -46,15 +48,9 @@ public class GameLoopFlowController : MonoBehaviour
         UnbindButtons();
     }
 
-    private void Update()
-    {
-        InitializeIfNeeded();
-        TrySubscribeToPlayerDeath();
-    }
-
     public void RequestWinFromExit()
     {
-        if (!CanCheckWinCondition())
+        if (!CanTriggerWin())
             return;
 
         if (exitActivationObjectOverride != null && !exitActivationObjectOverride.activeInHierarchy)
@@ -63,77 +59,41 @@ public class GameLoopFlowController : MonoBehaviour
         TriggerWin();
     }
 
-    private void InitializeIfNeeded()
-    {
-        if (initialized)
-            return;
-
-        TryResolvePlayer();
-        isUiSetupValid = ValidateUiSetup();
-        HideAllScreens();
-
-        initialized = true;
-    }
-
-    private void TryResolvePlayer()
+    private void ResolvePlayerStats()
     {
         if (playerStats == null)
             playerStats = FindFirstObjectByType<PlayerStats>();
     }
 
-    private bool ValidateUiSetup()
+    private void ValidateReferences()
     {
-        bool isValid = true;
-
         if (losePanel == null)
-        {
             Debug.LogError($"{name}: losePanel is not assigned.", this);
-            isValid = false;
-        }
 
         if (loseRestartButton == null)
-        {
             Debug.LogError($"{name}: loseRestartButton is not assigned.", this);
-            isValid = false;
-        }
 
         if (loseMenuButton == null)
-        {
             Debug.LogError($"{name}: loseMenuButton is not assigned.", this);
-            isValid = false;
-        }
 
         if (winPanel == null)
-        {
             Debug.LogError($"{name}: winPanel is not assigned.", this);
-            isValid = false;
-        }
 
         if (winMenuButton == null)
-        {
             Debug.LogError($"{name}: winMenuButton is not assigned.", this);
-            isValid = false;
-        }
 
         if (winNextWaveButton == null)
-        {
             Debug.LogError($"{name}: winNextWaveButton is not assigned.", this);
-            isValid = false;
-        }
 
         if (pausePanel == null && showDebugLogs)
             Debug.LogWarning($"{name}: pausePanel is not assigned. Pause UI will not be hidden on lose/win.", this);
 
         if (exitActivationObjectOverride == null && showDebugLogs)
             Debug.LogWarning($"{name}: exitActivationObjectOverride is not assigned. Win can still be requested by trigger.", this);
-
-        return isValid;
     }
 
     private void BindButtons()
     {
-        UnbindButtons();
-
         if (loseRestartButton != null)
             loseRestartButton.onClick.AddListener(HandleLoseRestartClicked);
 
@@ -162,31 +122,29 @@ public class GameLoopFlowController : MonoBehaviour
             winNextWaveButton.onClick.RemoveListener(HandleWinNextWaveClicked);
     }
 
-    private void TrySubscribeToPlayerDeath()
+    private void SubscribeToPlayerDeath()
     {
-        if (isSubscribedToDeath)
-            return;
+        if (playerStats == null)
+            ResolvePlayerStats();
 
         if (playerStats == null)
-            TryResolvePlayer();
+        {
+            if (showDebugLogs)
+                Debug.LogWarning($"{name}: PlayerStats not found. Lose on death is disabled.", this);
 
-        if (playerStats == null)
             return;
+        }
 
         playerStats.OnDeath += HandlePlayerDeath;
-        isSubscribedToDeath = true;
     }
 
     private void UnsubscribeFromPlayerDeath()
     {
-        if (!isSubscribedToDeath || playerStats == null)
-            return;
-
-        playerStats.OnDeath -= HandlePlayerDeath;
-        isSubscribedToDeath = false;
+        if (playerStats != null)
+            playerStats.OnDeath -= HandlePlayerDeath;
     }
 
-    private bool CanCheckWinCondition()
+    private bool CanTriggerWin()
     {
         if (flowFinished)
             return false;
@@ -213,10 +171,10 @@ public class GameLoopFlowController : MonoBehaviour
         if (GameManager.Instance != null)
             GameManager.Instance.EnterLoseState();
 
-        if (isUiSetupValid && losePanel != null)
+        if (losePanel != null)
             losePanel.SetActive(true);
         else
-            Debug.LogWarning($"{name}: lose state triggered, but lose UI is not fully configured.", this);
+            Debug.LogWarning($"{name}: lose state triggered, but losePanel is not assigned.", this);
 
         if (showDebugLogs)
             Debug.Log($"{name}: lose screen shown.", this);
@@ -233,10 +191,10 @@ public class GameLoopFlowController : MonoBehaviour
         if (GameManager.Instance != null)
             GameManager.Instance.EnterWinState();
 
-        if (isUiSetupValid && winPanel != null)
+        if (winPanel != null)
             winPanel.SetActive(true);
         else
-            Debug.LogWarning($"{name}: win state triggered, but win UI is not fully configured.", this);
+            Debug.LogWarning($"{name}: win state triggered, but winPanel is not assigned.", this);
 
         if (showDebugLogs)
             Debug.Log($"{name}: win screen shown.", this);
