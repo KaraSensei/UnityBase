@@ -1,13 +1,20 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
 /*
  * GameManager
- * Назначение: центральный менеджер состояния игры (меню, игра, пауза).
- * Что делает: управляет состоянием GameState, временем (Time.timeScale), загрузкой сцен и переключением ввода.
- * Связи: использует SceneLoader, InputManager, EventBus, SceneNames; Singleton через статическое свойство Instance.
- * Паттерны: Singleton, простая машина состояний (state machine), Facade над SceneLoader и EventBus.
+ * Назначение: центральный менеджер состояния игры и игрового flow.
+ * Что управляет:
+ *  - текущим состоянием игры (Menu/Playing/Paused/Lost/Won)
+ *  - timeScale при паузе/lose/win
+ *  - загрузкой уровней через SceneLoader
+ *  - простым progression по последовательности уровней (LevelSequenceData)
+ *
+ * Почему так:
+ *  - Для урока 9 нужен замкнутый loop с переходом между уровнями.
+ *  - Самый простой учебный вариант: хранить порядок уровней в ScriptableObject
+ *    и переключать сцену кнопкой "Next" на win экране.
  */
-
-using UnityEngine;
-
 public enum GameState
 {
     Menu,
@@ -21,13 +28,27 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
+    [Header("Level Sequence")]
+    [Tooltip("Путь в Resources до LevelSequenceData без расширения .asset.")]
+    [SerializeField] private string levelSequenceResourcePath = "Levels/LevelSequence_Default";
+    [SerializeField] private LevelSequenceData levelSequenceOverride;
+
     /// <summary>
-    /// Текущее состояние игры (меню / игра / пауза).
+    /// Текущее состояние игры.
     /// </summary>
     public GameState CurrentState { get; private set; } = GameState.Menu;
 
     /// <summary>
-    /// Инициализация Singleton и закрепление объекта между сценами.
+    /// Индекс текущего уровня из LevelSequenceData.
+    /// -1 означает "не определён или fallback режим".
+    /// </summary>
+    public int CurrentLevelIndex => currentLevelIndex;
+
+    private LevelSequenceData levelSequenceData;
+    private int currentLevelIndex = -1;
+
+    /// <summary>
+    /// Инициализирует singleton и подгружает конфиг последовательности уровней.
     /// </summary>
     private void Awake()
     {
@@ -39,32 +60,42 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        LoadLevelSequenceData();
     }
 
     /// <summary>
-    /// Запускает игру из меню: переключает состояние, сбрасывает время, загружает игровую сцену и включает ввод игрока.
+    /// Запускает новую игру из меню.
+    /// Логика: берём 0-й уровень из sequence, если sequence не найден - fallback на GameScene.
     /// </summary>
     public void StartGame()
     {
-        RestartGameScene();
+        currentLevelIndex = 0;
+
+        if (!TryGetLevelSceneName(currentLevelIndex, out string firstLevelScene))
+        {
+            firstLevelScene = SceneNames.GameScene;
+            currentLevelIndex = -1;
+        }
+
+        LoadGameplayScene(firstLevelScene);
     }
 
     /// <summary>
-    /// Возврат в главное меню: переключает состояние, сбрасывает скорость времени, загружает сцену меню и включает UI‑ввод.
+    /// Возвращает игрока в главное меню.
     /// </summary>
     public void GoToMenu()
     {
         CurrentState = GameState.Menu;
         Time.timeScale = 1f;
         SceneLoader.Instance.Load(SceneNames.MainMenu);
-        Debug.Log("Go to Main Menu");
+
         if (InputManager.Instance != null)
             InputManager.Instance.EnableUIInput();
     }
 
     /// <summary>
-    /// Ставит игру на паузу из состояния Playing:
-    /// останавливает время через Time.timeScale и оповещает слушателей через EventBus.
+    /// Ставит игру на паузу и публикует событие в EventBus.
     /// </summary>
     public void Pause()
     {
@@ -72,14 +103,12 @@ public class GameManager : MonoBehaviour
             return;
 
         CurrentState = GameState.Paused;
-        Time.timeScale = 0f; // простой вариант паузы
+        Time.timeScale = 0f;
         EventBus.Instance.RaiseGamePaused();
-        Debug.Log("Game paused");
     }
 
     /// <summary>
-    /// Снимает паузу из состояния Paused:
-    /// возвращает Time.timeScale к 1 и оповещает слушателей через EventBus.
+    /// Снимает паузу и публикует событие в EventBus.
     /// </summary>
     public void Resume()
     {
@@ -89,25 +118,38 @@ public class GameManager : MonoBehaviour
         CurrentState = GameState.Playing;
         Time.timeScale = 1f;
         EventBus.Instance.RaiseGameResumed();
-        Debug.Log("Game resumed");
     }
 
     /// <summary>
-    /// Перезапускает игровую сцену через Loading и переводит игру в состояние Playing.
-    /// Используется для "New Game" и "Restart" с lose-экрана.
+    /// Перезапускает текущий игровой уровень.
+    /// Метод сохранён для обратной совместимости со старыми кнопками/скриптами.
     /// </summary>
     public void RestartGameScene()
     {
-        CurrentState = GameState.Playing;
-        Time.timeScale = 1f;
-        SceneLoader.Instance.LoadWithLoading(SceneNames.GameScene);
-        Debug.Log("Game scene restart requested");
-        if (InputManager.Instance != null)
-            InputManager.Instance.EnablePlayerInput();
+        string sceneToReload = ResolveCurrentGameplayScene();
+        LoadGameplayScene(sceneToReload);
     }
 
     /// <summary>
-    /// Переводит игру в состояние поражения и включает UI-ввод.
+    /// Пытается загрузить следующий уровень из sequence.
+    /// Возвращает true, если уровень найден и загрузка запущена.
+    /// Возвращает false, если текущий уровень последний.
+    /// </summary>
+    public bool TryLoadNextLevel()
+    {
+        UpdateCurrentLevelIndexFromActiveScene();
+
+        int nextLevelIndex = currentLevelIndex + 1;
+        if (!TryGetLevelSceneName(nextLevelIndex, out string nextScene))
+            return false;
+
+        currentLevelIndex = nextLevelIndex;
+        LoadGameplayScene(nextScene);
+        return true;
+    }
+
+    /// <summary>
+    /// Переводит игру в состояние поражения.
     /// </summary>
     public void EnterLoseState()
     {
@@ -116,13 +158,13 @@ public class GameManager : MonoBehaviour
 
         CurrentState = GameState.Lost;
         Time.timeScale = 0f;
+
         if (InputManager.Instance != null)
             InputManager.Instance.EnableUIInput();
-        Debug.Log("Game lost");
     }
 
     /// <summary>
-    /// Переводит игру в состояние победы и включает UI-ввод.
+    /// Переводит игру в состояние победы.
     /// </summary>
     public void EnterWinState()
     {
@@ -131,8 +173,119 @@ public class GameManager : MonoBehaviour
 
         CurrentState = GameState.Won;
         Time.timeScale = 0f;
+
         if (InputManager.Instance != null)
             InputManager.Instance.EnableUIInput();
-        Debug.Log("Game won");
+    }
+
+    /// <summary>
+    /// Загружает sequence asset из Resources.
+    /// Если не найден, система всё равно работает в fallback режиме через GameScene.
+    /// </summary>
+    private void LoadLevelSequenceData()
+    {
+        if (levelSequenceOverride != null)
+        {
+            levelSequenceData = levelSequenceOverride;
+            return;
+        }
+
+#if UNITY_EDITOR
+        // В Editor приоритет у учебного ассета в _ScriptableObjects,
+        // чтобы брались именно те данные, которые вы редактируете вручную.
+        if (TryLoadLevelSequenceFromEditorAssetPath())
+            return;
+#endif
+
+        if (string.IsNullOrWhiteSpace(levelSequenceResourcePath))
+        {
+#if UNITY_EDITOR
+            TryLoadLevelSequenceFromEditorAssetPath();
+#endif
+            return;
+        }
+
+        levelSequenceData = Resources.Load<LevelSequenceData>(levelSequenceResourcePath);
+
+#if UNITY_EDITOR
+        if (levelSequenceData == null)
+            TryLoadLevelSequenceFromEditorAssetPath();
+#endif
+
+        if (levelSequenceData == null)
+        {
+            Debug.LogWarning(
+                $"GameManager: LevelSequenceData not found at Resources/{levelSequenceResourcePath}. " +
+                "Fallback to SceneNames.GameScene will be used.");
+        }
+    }
+
+#if UNITY_EDITOR
+    private bool TryLoadLevelSequenceFromEditorAssetPath()
+    {
+        const string editorAssetPath = "Assets/_ScriptableObjects/Levels/LevelSequenceData.asset";
+        levelSequenceData = UnityEditor.AssetDatabase.LoadAssetAtPath<LevelSequenceData>(editorAssetPath);
+        return levelSequenceData != null;
+    }
+#endif
+
+    /// <summary>
+    /// Единая точка перехода в игровую сцену:
+    /// переводит state в Playing, возвращает timeScale и включает player input.
+    /// </summary>
+    private void LoadGameplayScene(string sceneName)
+    {
+        CurrentState = GameState.Playing;
+        Time.timeScale = 1f;
+        SceneLoader.Instance.LoadWithLoading(sceneName);
+
+        if (InputManager.Instance != null)
+            InputManager.Instance.EnablePlayerInput();
+    }
+
+    /// <summary>
+    /// Безопасный доступ к имени сцены уровня из sequence.
+    /// </summary>
+    private bool TryGetLevelSceneName(int levelIndex, out string sceneName)
+    {
+        sceneName = null;
+
+        if (levelSequenceData == null)
+            return false;
+
+        return levelSequenceData.TryGetLevelSceneName(levelIndex, out sceneName);
+    }
+
+    /// <summary>
+    /// Синхронизирует currentLevelIndex с реально активной сценой.
+    /// Нужен перед вычислением "следующего" уровня.
+    /// </summary>
+    private void UpdateCurrentLevelIndexFromActiveScene()
+    {
+        if (levelSequenceData == null)
+            return;
+
+        string activeSceneName = SceneManager.GetActiveScene().name;
+        int sceneIndex = levelSequenceData.FindLevelIndex(activeSceneName);
+        if (sceneIndex >= 0)
+            currentLevelIndex = sceneIndex;
+    }
+
+    /// <summary>
+    /// Определяет, какую сцену перезапускать на Restart:
+    /// 1) текущую сцену из sequence
+    /// 2) если sequence не знает сцену - активную сцену
+    /// 3) если активна MainMenu - fallback на GameScene
+    /// </summary>
+    private string ResolveCurrentGameplayScene()
+    {
+        UpdateCurrentLevelIndexFromActiveScene();
+
+        if (TryGetLevelSceneName(currentLevelIndex, out string sceneName))
+            return sceneName;
+
+        return SceneManager.GetActiveScene().name == SceneNames.MainMenu
+            ? SceneNames.GameScene
+            : SceneManager.GetActiveScene().name;
     }
 }

@@ -105,6 +105,14 @@ public class SceneLoader : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // Важный hook для EventBus:
+        // публикуем факт загрузки ЛЮБОЙ сцены (MainMenu, Loading, GameScene, etc).
+        // Это даёт внешним системам единый "сигнал жизни" без прямой зависимости от SceneLoader.
+        if (EventBus.Instance != null)
+            EventBus.Instance.RaiseLevelLoaded(scene.name);
+
+        // Логика ниже относится только к двухшаговому flow через Loading:
+        // сначала открыли Loading, затем из неё грузим целевую сцену.
         if (!_waitForLoadingScene)
             return;
 

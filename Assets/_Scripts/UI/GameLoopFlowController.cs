@@ -1,7 +1,16 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
+/*
+ * GameLoopFlowController
+ * Назначение: связывает lose/win UI с состоянием игры.
+ * Что важно для урока 9:
+ *  - Lose: restart/menu
+ *  - Win: переход на следующий уровень в sequence
+ *    (если следующего уровня нет - возврат в меню)
+ */
 public class GameLoopFlowController : MonoBehaviour
 {
     [Header("Lose UI (scene canvas or prefab)")]
@@ -12,7 +21,9 @@ public class GameLoopFlowController : MonoBehaviour
     [Header("Win UI (scene canvas or prefab)")]
     [SerializeField] private GameObject winPanel;
     [SerializeField] private Button winMenuButton;
-    [SerializeField] private Button winNextWaveButton;
+
+    [FormerlySerializedAs("winNextWaveButton")]
+    [SerializeField] private Button winNextLevelButton;
 
     [Header("Shared UI")]
     [SerializeField] private GameObject pausePanel;
@@ -21,12 +32,17 @@ public class GameLoopFlowController : MonoBehaviour
     [Tooltip("Exit object that becomes active after encounter completion.")]
     [SerializeField] private GameObject exitActivationObjectOverride;
 
+    [Tooltip("ID обязательного encounter для победы через выход. Если пусто, фильтр по ID отключён.")]
+    [SerializeField] private string requiredEncounterIdForWin = string.Empty;
+
     [Header("Debug")]
     [SerializeField] private bool showDebugLogs = true;
 
     private PlayerStats playerStats;
     private bool flowFinished;
+    private bool isEncounterCompletedForWin;
 
+    // Legacy-событие оставлено для обратной совместимости старых учебных подписок.
     public event Action OnNextWaveRequested;
 
     private void Awake()
@@ -39,21 +55,31 @@ public class GameLoopFlowController : MonoBehaviour
     private void OnEnable()
     {
         SubscribeToPlayerDeath();
+        SubscribeToEncounterCompleted();
         BindButtons();
     }
 
     private void OnDisable()
     {
         UnsubscribeFromPlayerDeath();
+        UnsubscribeFromEncounterCompleted();
         UnbindButtons();
     }
 
+    /// <summary>
+    /// Запрашивает победу от exit-триггера.
+    /// Контракт: победа возможна только когда игра в состоянии Playing,
+    /// выход реально активирован в сцене, и (если задан ID) обязательный encounter уже завершён.
+    /// </summary>
     public void RequestWinFromExit()
     {
         if (!CanTriggerWin())
             return;
 
         if (exitActivationObjectOverride != null && !exitActivationObjectOverride.activeInHierarchy)
+            return;
+
+        if (!CanWinByEncounterRule())
             return;
 
         TriggerWin();
@@ -82,8 +108,8 @@ public class GameLoopFlowController : MonoBehaviour
         if (winMenuButton == null)
             Debug.LogError($"{name}: winMenuButton is not assigned.", this);
 
-        if (winNextWaveButton == null)
-            Debug.LogError($"{name}: winNextWaveButton is not assigned.", this);
+        if (winNextLevelButton == null)
+            Debug.LogError($"{name}: winNextLevelButton is not assigned.", this);
 
         if (pausePanel == null && showDebugLogs)
             Debug.LogWarning($"{name}: pausePanel is not assigned. Pause UI will not be hidden on lose/win.", this);
@@ -103,8 +129,8 @@ public class GameLoopFlowController : MonoBehaviour
         if (winMenuButton != null)
             winMenuButton.onClick.AddListener(HandleMenuClicked);
 
-        if (winNextWaveButton != null)
-            winNextWaveButton.onClick.AddListener(HandleWinNextWaveClicked);
+        if (winNextLevelButton != null)
+            winNextLevelButton.onClick.AddListener(HandleWinNextLevelClicked);
     }
 
     private void UnbindButtons()
@@ -118,8 +144,8 @@ public class GameLoopFlowController : MonoBehaviour
         if (winMenuButton != null)
             winMenuButton.onClick.RemoveListener(HandleMenuClicked);
 
-        if (winNextWaveButton != null)
-            winNextWaveButton.onClick.RemoveListener(HandleWinNextWaveClicked);
+        if (winNextLevelButton != null)
+            winNextLevelButton.onClick.RemoveListener(HandleWinNextLevelClicked);
     }
 
     private void SubscribeToPlayerDeath()
@@ -144,6 +170,41 @@ public class GameLoopFlowController : MonoBehaviour
             playerStats.OnDeath -= HandlePlayerDeath;
     }
 
+    private void SubscribeToEncounterCompleted()
+    {
+        if (EventBus.Instance != null)
+            EventBus.Instance.OnEncounterCompleted += HandleEncounterCompleted;
+    }
+
+    private void UnsubscribeFromEncounterCompleted()
+    {
+        if (EventBus.Instance != null)
+            EventBus.Instance.OnEncounterCompleted -= HandleEncounterCompleted;
+    }
+
+    /// <summary>
+    /// Обрабатывает глобальное событие завершения encounter.
+    /// Если requiredEncounterIdForWin пустой, любой encounter считается валидным для win-логики.
+    /// Если ID задан, засчитываем только точное совпадение (Ordinal).
+    /// </summary>
+    private void HandleEncounterCompleted(string encounterId)
+    {
+        if (string.IsNullOrWhiteSpace(requiredEncounterIdForWin))
+        {
+            isEncounterCompletedForWin = true;
+            if (showDebugLogs)
+                Debug.Log($"{name}: encounter '{encounterId}' завершён. Фильтр ID отключён, win-разрешение обновлено.", this);
+            return;
+        }
+
+        if (string.Equals(requiredEncounterIdForWin, encounterId, StringComparison.Ordinal))
+        {
+            isEncounterCompletedForWin = true;
+            if (showDebugLogs)
+                Debug.Log($"{name}: encounter '{encounterId}' совпал с requiredEncounterIdForWin. Win-разрешение обновлено.", this);
+        }
+    }
+
     private bool CanTriggerWin()
     {
         if (flowFinished)
@@ -153,6 +214,20 @@ public class GameLoopFlowController : MonoBehaviour
             return false;
 
         return GameManager.Instance.CurrentState == GameState.Playing;
+    }
+
+    private bool CanWinByEncounterRule()
+    {
+        if (string.IsNullOrWhiteSpace(requiredEncounterIdForWin))
+            return true;
+
+        if (isEncounterCompletedForWin)
+            return true;
+
+        if (showDebugLogs)
+            Debug.Log($"{name}: win отклонён. Encounter '{requiredEncounterIdForWin}' ещё не завершён.", this);
+
+        return false;
     }
 
     private void HandlePlayerDeath()
@@ -227,14 +302,31 @@ public class GameLoopFlowController : MonoBehaviour
             GameManager.Instance.GoToMenu();
     }
 
-    private void HandleWinNextWaveClicked()
+    /// <summary>
+    /// Обработчик кнопки "Next" на win-экране.
+    /// Почему так реализовано:
+    /// 1) Сначала пробуем прогрессию уровня через GameManager.TryLoadNextLevel().
+    /// 2) Если уровни закончились, возвращаем игрока в меню.
+    /// 3) Legacy fallback через OnNextWaveRequested оставлен для обратной совместимости.
+    /// </summary>
+    private void HandleWinNextLevelClicked()
     {
+        if (GameManager.Instance != null)
+        {
+            if (GameManager.Instance.TryLoadNextLevel())
+                return;
+
+            // Если следующего уровня нет в sequence, считаем run завершённым и уходим в меню.
+            GameManager.Instance.GoToMenu();
+            return;
+        }
+
         if (OnNextWaveRequested != null)
         {
             OnNextWaveRequested.Invoke();
             return;
         }
 
-        Debug.Log($"{name}: Next Wave clicked. Implementation will be added in a later lesson.", this);
+        Debug.LogWarning($"{name}: GameManager is missing. Next level flow cannot continue.", this);
     }
 }

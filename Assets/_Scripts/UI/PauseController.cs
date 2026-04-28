@@ -1,20 +1,34 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+/*
+ * PauseController
+ * Назначение: управление pause UI и реакцией на pause/cancel ввод.
+ * Что делает:
+ *  - слушает события паузы/возобновления из EventBus;
+ *  - открывает/закрывает pausePanel;
+ *  - обрабатывает кнопки Resume/Main Menu;
+ *  - обрабатывает input-действия Pause/Cancel через InputManager.
+ * Связи: EventBus, InputManager, GameManager.
+ * Паттерны: event-driven UI controller.
+ */
 public class PauseController : MonoBehaviour
 {
     [SerializeField] private GameObject pausePanel;
     [SerializeField] private Button buttonResume;
     [SerializeField] private Button buttonMainMenu;
 
+    /// <summary>
+    /// Подписывается на события при включении объекта.
+    /// </summary>
     private void OnEnable()
     {
-        // Подписываемся на события EventBus при включении объекта
         if (EventBus.Instance != null)
         {
             EventBus.Instance.OnGamePaused += ShowPausePanel;
             EventBus.Instance.OnGameResumed += HidePausePanel;
         }
+
         if (InputManager.Instance != null)
         {
             InputManager.Instance.OnPausePressed += HandlePausePressed;
@@ -22,14 +36,17 @@ public class PauseController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Отписывается от событий при выключении объекта.
+    /// </summary>
     private void OnDisable()
     {
-        // Отписываемся от событий при выключении объекта (ВАЖНО для предотвращения утечек памяти!)
         if (EventBus.Instance != null)
         {
             EventBus.Instance.OnGamePaused -= ShowPausePanel;
             EventBus.Instance.OnGameResumed -= HidePausePanel;
         }
+
         if (InputManager.Instance != null)
         {
             InputManager.Instance.OnPausePressed -= HandlePausePressed;
@@ -37,16 +54,18 @@ public class PauseController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Привязывает UI-кнопки pause меню.
+    /// </summary>
     private void Start()
     {
-        // Подключаем кнопки (Start вызывается после всех Awake, поэтому менеджеры уже созданы)
         if (buttonResume != null)
             buttonResume.onClick.AddListener(OnResumeClicked);
+
         if (buttonMainMenu != null)
             buttonMainMenu.onClick.AddListener(OnMainMenuClicked);
     }
 
-    // Эти методы вызываются автоматически через EventBus
     private void ShowPausePanel()
     {
         if (pausePanel != null)
@@ -59,11 +78,10 @@ public class PauseController : MonoBehaviour
             pausePanel.SetActive(false);
     }
 
-    // Обработчики кнопок
     private void OnResumeClicked()
     {
         if (GameManager.Instance != null)
-            GameManager.Instance.Resume(); // вызовет EventBus, который скроет панель
+            GameManager.Instance.Resume();
     }
 
     private void OnMainMenuClicked()
@@ -71,6 +89,7 @@ public class PauseController : MonoBehaviour
         if (GameManager.Instance != null)
             GameManager.Instance.GoToMenu();
     }
+
     private void HandlePausePressed()
     {
         if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Playing)

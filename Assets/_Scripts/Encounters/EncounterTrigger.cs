@@ -390,7 +390,19 @@ public class EncounterTrigger : MonoBehaviour
 
         SetObjectsActive(activateOnCompleted, true);
 
+        // Локальное событие для прямых подписчиков конкретного trigger-объекта.
         OnEncounterCompleted?.Invoke(this);
+
+        // Глобальное событие через EventBus:
+        // нужно, чтобы внешние системы (HUD/аналитика/квесты/прогрессия уровня)
+        // могли реагировать на завершение encounter без прямой ссылки на этот компонент.
+        if (EventBus.Instance != null)
+        {
+            // Берём стабильный encounterId из данных.
+            // Если данные вдруг отсутствуют - используем имя объекта как безопасный fallback.
+            string encounterId = encounterData != null ? encounterData.EncounterId : name;
+            EventBus.Instance.RaiseEncounterCompleted(encounterId);
+        }
 
         if (showDebugLogs)
             Debug.Log($"{name}: encounter '{encounterData.EncounterId}' завершён.", this);
