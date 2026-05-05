@@ -3,14 +3,9 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
-/*
- * GameLoopFlowController
- * Назначение: связывает lose/win UI с состоянием игры.
- * Что важно для урока 9:
- *  - Lose: restart/menu
- *  - Win: переход на следующий уровень в sequence
- *    (если следующего уровня нет - возврат в меню)
- */
+/// <summary>
+/// Связывает lose/win UI с состояниями игры и переходом на следующий уровень.
+/// </summary>
 public class GameLoopFlowController : MonoBehaviour
 {
     [Header("Lose UI (scene canvas or prefab)")]
@@ -67,9 +62,7 @@ public class GameLoopFlowController : MonoBehaviour
     }
 
     /// <summary>
-    /// Запрашивает победу от exit-триггера.
-    /// Контракт: победа возможна только когда игра в состоянии Playing,
-    /// выход реально активирован в сцене, и (если задан ID) обязательный encounter уже завершён.
+    /// Запрашивает победу от exit-триггера с проверкой условий win.
     /// </summary>
     public void RequestWinFromExit()
     {
@@ -183,9 +176,7 @@ public class GameLoopFlowController : MonoBehaviour
     }
 
     /// <summary>
-    /// Обрабатывает глобальное событие завершения encounter.
-    /// Если requiredEncounterIdForWin пустой, любой encounter считается валидным для win-логики.
-    /// Если ID задан, засчитываем только точное совпадение (Ordinal).
+    /// Отмечает completion encounter, который разрешает победу через выход.
     /// </summary>
     private void HandleEncounterCompleted(string encounterId)
     {
@@ -303,11 +294,7 @@ public class GameLoopFlowController : MonoBehaviour
     }
 
     /// <summary>
-    /// Обработчик кнопки "Next" на win-экране.
-    /// Почему так реализовано:
-    /// 1) Сначала пробуем прогрессию уровня через GameManager.TryLoadNextLevel().
-    /// 2) Если уровни закончились, возвращаем игрока в меню.
-    /// 3) Legacy fallback через OnNextWaveRequested оставлен для обратной совместимости.
+    /// Обработчик кнопки перехода на следующий уровень с win-экрана.
     /// </summary>
     private void HandleWinNextLevelClicked()
     {
@@ -316,7 +303,7 @@ public class GameLoopFlowController : MonoBehaviour
             if (GameManager.Instance.TryLoadNextLevel())
                 return;
 
-            // Если следующего уровня нет в sequence, считаем run завершённым и уходим в меню.
+            // Если следующего уровня нет, завершаем прогон и уходим в меню.
             GameManager.Instance.GoToMenu();
             return;
         }

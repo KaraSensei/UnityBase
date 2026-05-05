@@ -2,9 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// HUD presenter for gameplay:
-/// HP (text + fill), Mana (fill), XP (fill), Level (text), Weapon icon (with switching).
-/// The script assumes UI is prepared in a prefab and only updates bound references.
+/// HUD — presenter: слушает события и обновляет UI (HP, мана, опыт, уровень, иконка оружия).
 /// </summary>
 public class GameplayHUDController : MonoBehaviour
 {
@@ -110,25 +108,12 @@ public class GameplayHUDController : MonoBehaviour
         if (playerProgression != null)
         {
             HandleLevelUp(playerProgression.CurrentLevel);
-
-            float requiredXp = CalculateRequiredExperienceForCurrentLevel(playerProgression);
+            float requiredXp = playerProgression.RequiredExperienceForNextLevel;
             HandleExperienceChanged(playerProgression.CurrentExperience, requiredXp);
         }
 
         if (weaponManager != null)
-            HandleWeaponChanged(
-                weaponManager.CurrentWeapon,
-                weaponManager.CurrentWeaponIndex,
-                weaponManager.AvailableWeaponCount);
-    }
-
-    private static float CalculateRequiredExperienceForCurrentLevel(PlayerProgression progression)
-    {
-        if (progression == null)
-            return 1f;
-
-        int power = Mathf.Max(0, progression.CurrentLevel - 1);
-        return progression.baseExperienceToNextLevel * Mathf.Pow(progression.experienceGrowthFactor, power);
+            HandleWeaponChanged(weaponManager.CurrentWeapon);
     }
 
     private void HandleHealthChanged(float current, float max)
@@ -158,7 +143,7 @@ public class GameplayHUDController : MonoBehaviour
             levelValueText.text = level.ToString();
     }
 
-    private void HandleWeaponChanged(WeaponBase weapon, int index, int total)
+    private void HandleWeaponChanged(WeaponBase weapon)
     {
         if (weaponIconImage == null)
             return;

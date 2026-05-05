@@ -33,6 +33,12 @@ public class PlayerProgression : MonoBehaviour
     /// </summary>
     public float CurrentExperience => currentExperience;
 
+    /// <summary>
+    /// Сколько опыта нужно до следующего уровня при текущем уровне.
+    /// Это единый источник истины для UI и других систем.
+    /// </summary>
+    public float RequiredExperienceForNextLevel => GetRequiredExperienceForNextLevel();
+
     [Tooltip("Базовое количество опыта для перехода с 1 на 2 уровень.")]
     public float baseExperienceToNextLevel = 100f;
 

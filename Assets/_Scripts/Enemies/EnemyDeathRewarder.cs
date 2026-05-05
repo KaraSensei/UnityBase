@@ -2,14 +2,15 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Слушает смерть врагов (EnemyStats.OnDied)
-/// и передаёт опыт в PlayerProgression.
+/// Начисляет опыт игроку при смерти врагов.
 /// </summary>
 public class EnemyDeathRewarder : MonoBehaviour
 {
     [Header("Ссылки")]
-    [Tooltip("Компонент прогрессии игрока, куда будем добавлять опыт.")]
-    public PlayerProgression playerProgression;
+    [Tooltip("Компонент прогрессии игрока, куда добавляется опыт.")]
+    [SerializeField] private PlayerProgression playerProgression;
+
+    public PlayerProgression PlayerProgression => playerProgression;
 
     private readonly HashSet<EnemyStats> registeredEnemies = new HashSet<EnemyStats>();
 
@@ -23,31 +24,22 @@ public class EnemyDeathRewarder : MonoBehaviour
         RegisterExistingEnemiesInScene();
     }
 
-    /// <summary>
-    /// Регистрирует врага: подписывается на его событие смерти.
-    /// </summary>
     public void RegisterEnemy(EnemyStats stats)
     {
         if (stats == null || registeredEnemies.Contains(stats))
             return;
 
         ResolvePlayerProgressionIfNeeded();
-
-        // Подписываемся на событие смерти конкретного врага.
         stats.OnDied += HandleEnemyDied;
         registeredEnemies.Add(stats);
     }
 
-    /// <summary>
-    /// Обработчик смерти врага.
-    /// Отдаёт игроку опыт за этого врага.
-    /// </summary>
     private void HandleEnemyDied(EnemyStats stats)
     {
         if (stats == null)
             return;
 
-        // Очень важно отписаться, чтобы не копить "лишние" подписки.
+        // Критично отписаться сразу, чтобы избежать дублирующихся наград и утечек подписок.
         stats.OnDied -= HandleEnemyDied;
         registeredEnemies.Remove(stats);
 
@@ -60,10 +52,7 @@ public class EnemyDeathRewarder : MonoBehaviour
 
         float reward = stats.ExperienceReward;
         if (reward > 0f)
-        {
-            // Добавляем опыт игроку.
             playerProgression.AddExperience(reward);
-        }
     }
 
     private void OnDisable()
@@ -82,6 +71,7 @@ public class EnemyDeathRewarder : MonoBehaviour
         if (playerProgression != null)
             return;
 
+        // Нужен fallback для сцен, где ссылка не проставлена вручную в инспекторе.
         playerProgression = FindFirstObjectByType<PlayerProgression>();
     }
 

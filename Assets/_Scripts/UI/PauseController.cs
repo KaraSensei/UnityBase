@@ -1,26 +1,15 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/*
- * PauseController
- * Назначение: управление pause UI и реакцией на pause/cancel ввод.
- * Что делает:
- *  - слушает события паузы/возобновления из EventBus;
- *  - открывает/закрывает pausePanel;
- *  - обрабатывает кнопки Resume/Main Menu;
- *  - обрабатывает input-действия Pause/Cancel через InputManager.
- * Связи: EventBus, InputManager, GameManager.
- * Паттерны: event-driven UI controller.
- */
+/// <summary>
+/// Управляет pause-экраном: показывает/скрывает панель и обрабатывает кнопки/ввод паузы.
+/// </summary>
 public class PauseController : MonoBehaviour
 {
     [SerializeField] private GameObject pausePanel;
     [SerializeField] private Button buttonResume;
     [SerializeField] private Button buttonMainMenu;
 
-    /// <summary>
-    /// Подписывается на события при включении объекта.
-    /// </summary>
     private void OnEnable()
     {
         if (EventBus.Instance != null)
@@ -36,11 +25,9 @@ public class PauseController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Отписывается от событий при выключении объекта.
-    /// </summary>
     private void OnDisable()
     {
+        // Важно отписываться в OnDisable, чтобы не копить дубли подписок при повторных активациях.
         if (EventBus.Instance != null)
         {
             EventBus.Instance.OnGamePaused -= ShowPausePanel;
@@ -54,9 +41,6 @@ public class PauseController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Привязывает UI-кнопки pause меню.
-    /// </summary>
     private void Start()
     {
         if (buttonResume != null)

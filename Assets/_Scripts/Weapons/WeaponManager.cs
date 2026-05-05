@@ -3,14 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Назначение: управляет доступными оружиями игрока и переключением между ними.
-/// Что делает: хранит экземпляры оружия на префабе игрока, включает нужный слот и передаёт выполнение атаки текущему оружию.
-/// Связи: работает вместе с PlayerStats и PlayerCombatController. Сам больше не решает, в какой кадр должна произойти атака.
-/// Паттерны: Single Responsibility, композиция оружий через дочерние объекты.
+/// Управляет доступными оружиями игрока и переключением между ними.
 /// </summary>
 public class WeaponManager : MonoBehaviour
 {
-    public event Action<WeaponBase, int, int> OnWeaponChanged;
+    public event Action<WeaponBase> OnWeaponChanged;
 
     [Header("Связи")]
     [Tooltip("Статы игрока. Нужны для проверки смерти и будущих модификаторов урона.")]
@@ -37,10 +34,6 @@ public class WeaponManager : MonoBehaviour
     /// Текущее активное оружие игрока.
     /// </summary>
     public WeaponBase CurrentWeapon => currentWeapon;
-
-    public int CurrentWeaponIndex => currentAvailableIndex;
-
-    public int AvailableWeaponCount => availableWeapons.Count;
 
     /// <summary>
     /// Статы игрока.
@@ -218,8 +211,7 @@ public class WeaponManager : MonoBehaviour
         if (weapon == null)
             return;
 
-        // Пока оружие привязано к текущей иерархии игрока.
-        // Позже сюда можно добавить более точную привязку к кости руки через Animator/GetBoneTransform.
+        // Привязываем оружие к игроку и сбрасываем локальную трансформацию при экипировке.
         weapon.Owner = transform;
         weapon.transform.localPosition = Vector3.zero;
         weapon.transform.localRotation = Quaternion.identity;
@@ -227,6 +219,6 @@ public class WeaponManager : MonoBehaviour
 
     private void RaiseWeaponChanged()
     {
-        OnWeaponChanged?.Invoke(currentWeapon, currentAvailableIndex, availableWeapons.Count);
+        OnWeaponChanged?.Invoke(currentWeapon);
     }
 }
