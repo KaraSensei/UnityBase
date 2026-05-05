@@ -165,6 +165,7 @@ MonoBehaviour:
   maxEnemies: 10
   spawnOnStart: 0
   showDebugLogs: 1
+  enemyDeathRewarder: {fileID: 0}
 --- !u!4 &46129963
 Transform:
   m_ObjectHideFlags: 0
@@ -6189,10 +6190,6 @@ PrefabInstance:
     - target: {fileID: 7576200036586317813, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
       propertyPath: m_Name
       value: Player
-      objectReference: {fileID: 0}
-    - target: {fileID: 7576200036586317813, guid: 4fa5e052c85fc6f4288421268b000ac9, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

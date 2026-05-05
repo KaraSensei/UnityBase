@@ -130,6 +130,7 @@ GameObject:
   - component: {fileID: 2745678429726030687}
   - component: {fileID: 1479929768585675597}
   - component: {fileID: 5771473661925111548}
+  - component: {fileID: 7609748433149630794}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -281,6 +282,19 @@ MonoBehaviour:
   attackStartEffectPrefab: {fileID: 0}
   attackActionEffectPrefab: {fileID: 0}
   enableDebugLogs: 1
+--- !u!114 &7609748433149630794
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7576200036586317813}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57c2a507f3fc4bf41b37930c95e2f55e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerProgression: {fileID: 2745678429726030687}
 --- !u!1001 &3497069683474954731
 PrefabInstance:
   m_ObjectHideFlags: 0

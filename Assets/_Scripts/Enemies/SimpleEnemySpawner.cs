@@ -44,6 +44,10 @@ public class SimpleEnemySpawner : MonoBehaviour
     [Tooltip("Показывать подробные логи спавнера.")]
     [SerializeField] private bool showDebugLogs = true;
 
+    [Header("Награды")]
+    [Tooltip("Система выдачи опыта за убийство врагов.")]
+    [SerializeField] private EnemyDeathRewarder enemyDeathRewarder;
+
     private bool isSpawning;
     private Coroutine spawnCoroutine;
     private Transform playerTarget;
@@ -57,6 +61,7 @@ public class SimpleEnemySpawner : MonoBehaviour
     private void Start()
     {
         ResolvePlayerTarget();
+        ResolveRewarderIfNeeded();
 
         if (!ValidateSetup())
             return;
@@ -183,6 +188,14 @@ public class SimpleEnemySpawner : MonoBehaviour
         }
 
         enemy.Setup(data);
+
+        EnemyStats enemyStats = enemyObject.GetComponent<EnemyStats>();
+        if (enemyStats == null)
+            enemyStats = enemyObject.AddComponent<EnemyStats>();
+
+        if (enemyStats != null && enemyDeathRewarder != null)
+            enemyDeathRewarder.RegisterEnemy(enemyStats);
+
         if (target != null)
             enemy.SetTarget(target);
 
@@ -224,6 +237,22 @@ public class SimpleEnemySpawner : MonoBehaviour
     {
         PlayerController player = FindFirstObjectByType<PlayerController>();
         playerTarget = player != null ? player.transform : null;
+    }
+
+    private void ResolveRewarderIfNeeded()
+    {
+        if (enemyDeathRewarder != null)
+            return;
+
+        enemyDeathRewarder = FindFirstObjectByType<EnemyDeathRewarder>();
+        if (enemyDeathRewarder != null)
+            return;
+
+        GameObject rewarderObject = new GameObject("EnemyDeathRewarder");
+        enemyDeathRewarder = rewarderObject.AddComponent<EnemyDeathRewarder>();
+
+        if (showDebugLogs)
+            Debug.LogWarning($"{name}: EnemyDeathRewarder не найден, создан автоматически.", this);
     }
 
     private Transform GetRandomSpawnPoint()
