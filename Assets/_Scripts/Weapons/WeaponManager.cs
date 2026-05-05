@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,6 +10,8 @@ using UnityEngine;
 /// </summary>
 public class WeaponManager : MonoBehaviour
 {
+    public event Action<WeaponBase, int, int> OnWeaponChanged;
+
     [Header("Связи")]
     [Tooltip("Статы игрока. Нужны для проверки смерти и будущих модификаторов урона.")]
     [SerializeField] private PlayerStats playerStats;
@@ -34,6 +37,10 @@ public class WeaponManager : MonoBehaviour
     /// Текущее активное оружие игрока.
     /// </summary>
     public WeaponBase CurrentWeapon => currentWeapon;
+
+    public int CurrentWeaponIndex => currentAvailableIndex;
+
+    public int AvailableWeaponCount => availableWeapons.Count;
 
     /// <summary>
     /// Статы игрока.
@@ -122,6 +129,7 @@ public class WeaponManager : MonoBehaviour
 
         currentWeapon = weapon;
         SetupWeapon(currentWeapon);
+        RaiseWeaponChanged();
     }
 
     /// <summary>
@@ -196,7 +204,10 @@ public class WeaponManager : MonoBehaviour
 
         WeaponBase weapon = weaponInstances[slotIndex];
         if (weapon != null && !availableWeapons.Contains(weapon))
+        {
             availableWeapons.Add(weapon);
+            RaiseWeaponChanged();
+        }
     }
 
     /// <summary>
@@ -212,5 +223,10 @@ public class WeaponManager : MonoBehaviour
         weapon.Owner = transform;
         weapon.transform.localPosition = Vector3.zero;
         weapon.transform.localRotation = Quaternion.identity;
+    }
+
+    private void RaiseWeaponChanged()
+    {
+        OnWeaponChanged?.Invoke(currentWeapon, currentAvailableIndex, availableWeapons.Count);
     }
 }
