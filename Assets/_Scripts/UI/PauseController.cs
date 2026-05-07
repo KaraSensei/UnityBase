@@ -1,14 +1,35 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Управляет pause-экраном: показывает/скрывает панель и обрабатывает кнопки/ввод паузы.
-/// </summary>
+/*
+ * PauseController
+ * Назначение: управляет показом/скрытием паузы и действиями Resume/Main Menu.
+ * Роль в игре: обслуживает только pause-flow, без логики панели настроек.
+ * Связи: EventBus (события паузы), InputManager (клавиши), GameManager (смена состояния), UI-кнопки.
+ * Как используется: вешается в игровой сцене, ссылки на pausePanel и кнопки назначаются в Inspector.
+ * Идеи расширения:
+ * - Добавить установку фокуса на Resume при открытии паузы.
+ * - Добавить анимацию появления/скрытия панели.
+ * Практические советы:
+ * - Если пауза не открывается с клавиши, проверьте InputManager.Instance и его подписки.
+ * - Если кнопки молчат, сначала проверьте назначение buttonResume/buttonMainMenu в Inspector.
+ */
 public class PauseController : MonoBehaviour
 {
+    [Header("UI паузы")]
+    [Tooltip("Корневой объект панели паузы.")]
     [SerializeField] private GameObject pausePanel;
+
+    [Tooltip("Кнопка продолжения игры.")]
     [SerializeField] private Button buttonResume;
+
+    [Tooltip("Кнопка возврата в главное меню.")]
     [SerializeField] private Button buttonMainMenu;
+
+    private void Start()
+    {
+        ValidateReferences();
+    }
 
     private void OnEnable()
     {
@@ -23,11 +44,16 @@ public class PauseController : MonoBehaviour
             InputManager.Instance.OnPausePressed += HandlePausePressed;
             InputManager.Instance.OnCancelPressed += HandleCancelPressed;
         }
+
+        if (buttonResume != null)
+            buttonResume.onClick.AddListener(OnResumeClicked);
+
+        if (buttonMainMenu != null)
+            buttonMainMenu.onClick.AddListener(OnMainMenuClicked);
     }
 
     private void OnDisable()
     {
-        // Важно отписываться в OnDisable, чтобы не копить дубли подписок при повторных активациях.
         if (EventBus.Instance != null)
         {
             EventBus.Instance.OnGamePaused -= ShowPausePanel;
@@ -39,15 +65,24 @@ public class PauseController : MonoBehaviour
             InputManager.Instance.OnPausePressed -= HandlePausePressed;
             InputManager.Instance.OnCancelPressed -= HandleCancelPressed;
         }
-    }
 
-    private void Start()
-    {
         if (buttonResume != null)
-            buttonResume.onClick.AddListener(OnResumeClicked);
+            buttonResume.onClick.RemoveListener(OnResumeClicked);
 
         if (buttonMainMenu != null)
-            buttonMainMenu.onClick.AddListener(OnMainMenuClicked);
+            buttonMainMenu.onClick.RemoveListener(OnMainMenuClicked);
+    }
+
+    private void ValidateReferences()
+    {
+        if (pausePanel == null)
+            Debug.LogError($"{name}: pausePanel не назначен.", this);
+
+        if (buttonResume == null)
+            Debug.LogWarning($"{name}: buttonResume не назначен.", this);
+
+        if (buttonMainMenu == null)
+            Debug.LogWarning($"{name}: buttonMainMenu не назначен.", this);
     }
 
     private void ShowPausePanel()

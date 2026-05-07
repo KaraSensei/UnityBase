@@ -3,69 +3,106 @@ using UnityEngine.UI;
 
 /*
  * MainMenuController
- * Назначение: контроллер UI главного меню.
- * Что делает: подключает кнопки "New Game" и "Exit" к действиям приложения.
- * Связи: использует GameManager для старта игры и Application.Quit для выхода.
- * Паттерны: UI-controller (тонкий слой между кнопками и core-логикой).
+ * Назначение: связывает кнопки главного меню с игровым потоком и окном настроек.
+ * Роль в игре: запускает игру, открывает отдельную панель настроек, завершает приложение.
+ * Связи: GameManager, SettingsPanelController, кнопки UI главного меню.
+ * Как используется: вешается в MainMenu-сцене, ссылки задаются в Inspector.
+ * Идеи расширения:
+ * - Добавить подтверждение перед выходом из приложения.
+ * - Добавить звуковые эффекты на клики кнопок.
+ * Практические советы:
+ * - Для teacher repo лучше явные инспекторные связи, без автопоиска/автодобавления.
+ * - Если Settings не открывается, сначала проверьте ссылку settingsPanelController.
  */
 public class MainMenuController : MonoBehaviour
 {
+    [Header("Кнопки главного меню")]
+    [Tooltip("Кнопка начала новой игры.")]
     [SerializeField] private Button buttonNewGame;
+
+    [Tooltip("Кнопка открытия окна настроек.")]
+    [SerializeField] private Button buttonSettings;
+
+    [Tooltip("Кнопка выхода из приложения.")]
     [SerializeField] private Button buttonExit;
 
-    /// <summary>
-    /// Подключает обработчики кнопок.
-    /// Добавлены null-проверки, чтобы ошибка в инспекторе не приводила к silent-fail.
-    /// </summary>
+    [Header("Окно настроек")]
+    [Tooltip("Контроллер отдельной панели настроек в MainMenu.")]
+    [SerializeField] private SettingsPanelController settingsPanelController;
+
     private void Start()
     {
-        if (buttonNewGame == null)
-        {
-            Debug.LogError($"{name}: buttonNewGame is not assigned.", this);
-        }
-        else
-        {
-            buttonNewGame.onClick.AddListener(HandleNewGameClicked);
-        }
-
-        if (buttonExit == null)
-        {
-            Debug.LogError($"{name}: buttonExit is not assigned.", this);
-        }
-        else
-        {
-            buttonExit.onClick.AddListener(HandleExitClicked);
-        }
+        ValidateReferences();
     }
 
-    private void OnDestroy()
+    private void OnEnable()
+    {
+        if (buttonNewGame != null)
+            buttonNewGame.onClick.AddListener(HandleNewGameClicked);
+
+        if (buttonExit != null)
+            buttonExit.onClick.AddListener(HandleExitClicked);
+
+        if (buttonSettings != null)
+            buttonSettings.onClick.AddListener(HandleSettingsClicked);
+    }
+
+    private void OnDisable()
     {
         if (buttonNewGame != null)
             buttonNewGame.onClick.RemoveListener(HandleNewGameClicked);
 
         if (buttonExit != null)
             buttonExit.onClick.RemoveListener(HandleExitClicked);
+
+        if (buttonSettings != null)
+            buttonSettings.onClick.RemoveListener(HandleSettingsClicked);
     }
 
-    /// <summary>
-    /// Обработчик старта новой игры.
-    /// </summary>
+    private void ValidateReferences()
+    {
+        if (buttonNewGame == null)
+            Debug.LogError($"{name}: buttonNewGame не назначен.", this);
+
+        if (buttonExit == null)
+            Debug.LogError($"{name}: buttonExit не назначен.", this);
+
+        if (buttonSettings == null)
+            Debug.LogWarning($"{name}: buttonSettings не назначен.", this);
+
+        if (settingsPanelController == null)
+            Debug.LogError($"{name}: settingsPanelController не назначен в Inspector.", this);
+    }
+
     private void HandleNewGameClicked()
     {
         if (GameManager.Instance == null)
         {
-            Debug.LogError($"{name}: GameManager.Instance is null. Cannot start game.", this);
+            Debug.LogError($"{name}: GameManager.Instance == null. Нельзя начать игру.", this);
             return;
         }
 
         GameManager.Instance.StartGame();
     }
 
-    /// <summary>
-    /// Обработчик выхода из приложения.
-    /// </summary>
     private static void HandleExitClicked()
     {
         Application.Quit();
+    }
+
+    /// <summary>
+    /// Контракт: открывает отдельную панель настроек из главного меню.
+    /// Почему так: MainMenu использует оконный сценарий, отдельно от встроенных настроек Pause.
+    /// Как дебажить: если окно не открылось, проверьте settingsPanelController и ссылку settingsPanel внутри него.
+    /// </summary>
+    private void HandleSettingsClicked()
+    {
+        if (settingsPanelController == null)
+        {
+            Debug.LogError($"{name}: settingsPanelController отсутствует. Назначьте ссылку в Inspector.", this);
+            return;
+        }
+
+        settingsPanelController.OpenPanel();
     }
 }
