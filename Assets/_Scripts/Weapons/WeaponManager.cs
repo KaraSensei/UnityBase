@@ -1,3 +1,11 @@
+/*
+ * WeaponManager
+ * Назначение: управлять доступным оружием игрока и переключением между слотами.
+ * Что делает: строит список доступных оружий, экипирует оружие, публикует OnWeaponChanged,
+ *             запускает атаку через PlayerCombatController и применяет runtime-состояние оружия при переходе уровня.
+ * Связи: PlayerStats, PlayerCombatController, WeaponBase/WeaponData, InputManager, GameplayHUDController.
+ * Паттерны: локальный менеджер состояния оружия игрока.
+ */
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -36,6 +44,12 @@ public class WeaponManager : MonoBehaviour
     public WeaponBase CurrentWeapon => currentWeapon;
 
     /// <summary>
+    /// Индекс текущего оружия в массиве weaponInstances.
+    /// Нужен для runtime-переноса состояния между уровнями.
+    /// </summary>
+    public int CurrentWeaponSlotIndex => GetWeaponSlotIndex(currentWeapon);
+
+    /// <summary>
     /// Статы игрока.
     /// </summary>
     public PlayerStats PlayerStats => playerStats;
@@ -51,7 +65,9 @@ public class WeaponManager : MonoBehaviour
         BuildAvailableWeaponsList();
         if (availableWeapons.Count == 0)
         {
-            Debug.LogError("WeaponManager: нет доступных оружий. Заполните Weapon Instances и при необходимости Weapon Available At Start.", this);
+            Debug.LogError(
+                "WeaponManager: нет доступных оружий. Проверьте поля Weapon Instances и Weapon Available At Start на игроке.",
+                this);
             return;
         }
 
@@ -156,7 +172,9 @@ public class WeaponManager : MonoBehaviour
 
         if (playerCombatController == null)
         {
-            Debug.LogWarning("WeaponManager: не найден PlayerCombatController, атаку нельзя синхронизировать через Animator.", this);
+            Debug.LogWarning(
+                "WeaponManager: не найден PlayerCombatController. Проверьте компонент на объекте игрока.",
+                this);
             return;
         }
 
@@ -180,7 +198,9 @@ public class WeaponManager : MonoBehaviour
 
         if (currentWeapon == null)
         {
-            Debug.LogWarning("WeaponManager: нет активного оружия для выполнения атаки через Animation Event.", this);
+            Debug.LogWarning(
+                "WeaponManager: нет активного оружия для выполнения атаки через Animation Event.",
+                this);
             return;
         }
 
@@ -204,7 +224,76 @@ public class WeaponManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Настраивает владельца и локальное положение оружия после экипировки.
+    /// Применяет runtime-состояние оружия после перехода на следующий уровень.
+    /// Это не save/load на диск, только перенос в памяти.
+    /// </summary>
+    public void ApplyRuntimeState(int weaponSlotIndex)
+    {
+        if (availableWeapons.Count == 0)
+        {
+            Debug.LogWarning(
+                "WeaponManager.ApplyRuntimeState: нет доступных оружий для восстановления состояния. " +
+                "Проверьте Weapon Instances и Weapon Available At Start.",
+                this);
+            return;
+        }
+
+        if (weaponSlotIndex < 0)
+        {
+            Debug.LogWarning(
+                "WeaponManager.ApplyRuntimeState: получен отрицательный индекс слота. " +
+                "Текущее оружие оставлено без изменений.",
+                this);
+            return;
+        }
+
+        if (TryEquipWeaponBySlotIndex(weaponSlotIndex))
+            return;
+
+        if (currentWeapon != null)
+        {
+            Debug.LogWarning(
+                $"WeaponManager.ApplyRuntimeState: слот {weaponSlotIndex} недоступен в новой сцене. " +
+                "Оставляем текущее активное оружие.",
+                this);
+            RaiseWeaponChanged();
+            return;
+        }
+
+        int fallbackIndex = Mathf.Clamp(defaultWeaponIndexInAvailable, 0, availableWeapons.Count - 1);
+        currentAvailableIndex = fallbackIndex;
+        EquipByEnableDisable(availableWeapons[fallbackIndex]);
+
+        Debug.LogWarning(
+            $"WeaponManager.ApplyRuntimeState: слот {weaponSlotIndex} недоступен. " +
+            $"Применён fallback на доступное оружие с индексом {fallbackIndex} в списке availableWeapons.",
+            this);
+    }
+
+    /// <summary>
+    /// Пытается экипировать оружие по индексу слота в массиве weaponInstances.
+    /// Возвращает true при успехе.
+    /// </summary>
+    public bool TryEquipWeaponBySlotIndex(int slotIndex)
+    {
+        if (weaponInstances == null || slotIndex < 0 || slotIndex >= weaponInstances.Length)
+            return false;
+
+        WeaponBase weapon = weaponInstances[slotIndex];
+        if (weapon == null || !availableWeapons.Contains(weapon))
+            return false;
+
+        int availableIndex = availableWeapons.IndexOf(weapon);
+        if (availableIndex < 0)
+            return false;
+
+        currentAvailableIndex = availableIndex;
+        EquipByEnableDisable(weapon);
+        return true;
+    }
+
+    /// <summary>
+    /// Настраивает владельца и локальную трансформацию оружия после экипировки.
     /// </summary>
     private void SetupWeapon(WeaponBase weapon)
     {
@@ -220,5 +309,19 @@ public class WeaponManager : MonoBehaviour
     private void RaiseWeaponChanged()
     {
         OnWeaponChanged?.Invoke(currentWeapon);
+    }
+
+    private int GetWeaponSlotIndex(WeaponBase weapon)
+    {
+        if (weapon == null || weaponInstances == null)
+            return -1;
+
+        for (int i = 0; i < weaponInstances.Length; i++)
+        {
+            if (weaponInstances[i] == weapon)
+                return i;
+        }
+
+        return -1;
     }
 }

@@ -1,4 +1,12 @@
-﻿using System;
+/*
+ * PlayerStats
+ * Назначение: хранить текущее состояние игрока (HP/Mana) и обрабатывать урон/лечение.
+ * Что делает: инициализируется из PlayerData, публикует события изменения ресурсов и смерти,
+ *             применяет runtime-состояние после перехода на следующий уровень.
+ * Связи: PlayerData, системы боя, GameplayHUDController, GameManager (runtime transfer).
+ * Паттерны: state-компонент игрока.
+ */
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -47,7 +55,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public event Action<float, float> OnHealthChanged;
 
     /// <summary>
-    /// Вызывается при изменении маны / энергии.
+    /// Вызывается при изменении маны.
     /// Параметры: текущая мана, максимальная мана.
     /// </summary>
     public event Action<float, float> OnManaChanged;
@@ -74,7 +82,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         if (playerData == null)
         {
-            Debug.LogError("PlayerStats: PlayerData не назначен!", this);
+            Debug.LogError("PlayerStats: PlayerData не назначен. Проверьте ссылку на объекте игрока.", this);
             return;
         }
 
@@ -187,6 +195,39 @@ public class PlayerStats : MonoBehaviour, IDamageable
         currentMana += amount;
         currentMana = Mathf.Clamp(currentMana, 0f, playerData.maxMana);
 
+        OnManaChanged?.Invoke(currentMana, playerData.maxMana);
+    }
+
+    /// <summary>
+    /// Применяет runtime-состояние после перехода на следующий уровень.
+    /// Это не save/load на диск, только перенос в памяти.
+    /// </summary>
+    public void ApplyRuntimeState(float health, float mana)
+    {
+        if (playerData == null)
+        {
+            Debug.LogWarning(
+                "PlayerStats.ApplyRuntimeState: PlayerData не назначен. " +
+                "Проверьте ссылку PlayerData на объекте игрока в новой сцене.",
+                this);
+            return;
+        }
+
+        float safeHealth = health;
+        if (safeHealth <= 0f)
+        {
+            safeHealth = playerData.maxHealth >= 1f ? 1f : Mathf.Max(playerData.maxHealth, 0.01f);
+            Debug.LogWarning(
+                $"PlayerStats.ApplyRuntimeState: получено HP={health}. " +
+                $"Для следующего уровня применено безопасное значение HP={safeHealth}.",
+                this);
+        }
+
+        currentHealth = Mathf.Clamp(safeHealth, 0f, playerData.maxHealth);
+        currentMana = Mathf.Clamp(mana, 0f, playerData.maxMana);
+        isDead = false;
+
+        OnHealthChanged?.Invoke(currentHealth, playerData.maxHealth);
         OnManaChanged?.Invoke(currentMana, playerData.maxMana);
     }
 }
