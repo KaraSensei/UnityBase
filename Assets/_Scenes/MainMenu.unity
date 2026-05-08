@@ -1661,7 +1661,6 @@ MonoBehaviour:
   backButton: {fileID: 501826115}
   soundSources: []
   musicSources: []
-  panelCanBeClosed: 1
 --- !u!1 &1007163920
 GameObject:
   m_ObjectHideFlags: 0

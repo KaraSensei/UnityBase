@@ -683,10 +683,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 6800662175338214662}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.2183514, y: 0.61070305}
-  m_AnchorMax: {x: 0.30748624, y: 0.65435153}
-  m_AnchoredPosition: {x: -7.51001, y: 0.028137207}
-  m_SizeDelta: {x: 294.74728, y: 8.982208}
+  m_AnchorMin: {x: 0.215, y: 0.61070305}
+  m_AnchorMax: {x: 0.30748624, y: 0.6597083}
+  m_AnchoredPosition: {x: -5.01001, y: -1.9718628}
+  m_SizeDelta: {x: 289.74728, y: 4.9822083}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &5624281002396963188
 CanvasRenderer:
@@ -743,7 +743,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 41.2
+  m_fontSize: 41.15
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -2110,7 +2110,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &6716002657926779077
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2143,8 +2143,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c72c4a8d0bc4a1f9ed7113f49368a25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  soundSlider: {fileID: 5228683985736587154}
-  musicSlider: {fileID: 7283048585420121205}
+  soundSlider: {fileID: 0}
+  musicSlider: {fileID: 0}
   fullscreenToggle: {fileID: 8897613895380675330}
   soundSources: []
   musicSources: []
@@ -2438,9 +2438,9 @@ RectTransform:
   m_Father: {fileID: 6800662175338214662}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.7123244, y: 0.61070305}
-  m_AnchorMax: {x: 0.7963514, y: 0.65435153}
-  m_AnchoredPosition: {x: -3.7921143, y: 0.028137207}
-  m_SizeDelta: {x: 303.674, y: 8.982208}
+  m_AnchorMax: {x: 0.7963514, y: 0.6597083}
+  m_AnchoredPosition: {x: -3.7921143, y: -1.9718628}
+  m_SizeDelta: {x: 303.674, y: 4.9822083}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2316626654539949756
 CanvasRenderer:
@@ -2497,7 +2497,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 41.2
+  m_fontSize: 41.15
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -3246,23 +3246,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443272433364, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443272433364, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443890322336, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443890322336, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443890322336, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMin.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399444970251763, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_Name
@@ -3372,23 +3372,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443272433364, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443272433364, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443890322336, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443890322336, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399443890322336, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_AnchorMin.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1625399444970251763, guid: ac3e432dbbc921f4f8a12e70291e5358, type: 3}
       propertyPath: m_Name
