@@ -9,11 +9,23 @@ using UnityEngine.SceneManagement;
  *  - timeScale при паузе/lose/win
  *  - загрузкой уровней через SceneLoader
  *  - простым progression по последовательности уровней (LevelSequenceData)
+ *  - checkpoint-сохранением прогресса в конце уровня через Save Game Free
  *
  * Почему так:
  *  - Для урока 9 нужен замкнутый loop с переходом между уровнями.
  *  - Самый простой учебный вариант: хранить порядок уровней в ScriptableObject
  *    и переключать сцену кнопкой "Next" на win экране.
+ *  - Checkpoint уровня создаётся в момент входа в trigger выхода, когда encounter уже завершён.
+ *  - Отдельный CheckpointTrigger может сохранить те же данные в safe-point зоне внутри уровня.
+ *
+ * Потенциальные расширения:
+ *  - кнопка Continue в MainMenu
+ *  - загрузка с checkpoint после смерти
+ *  - несколько save slots для разных профилей
+ *
+ * Совет:
+ *  - При ошибках перехода проверить, что в сцене есть ровно один Player с PlayerStats/PlayerProgression/WeaponManager.
+ *  - При ошибках checkpoint проверить Console и наличие пакета BayatGames Save Game Free в Assets.
  */
 public enum GameState
 {
@@ -156,6 +168,112 @@ public class GameManager : MonoBehaviour
         pendingPlayerRuntimeState = CaptureCurrentPlayerRuntimeState();
         currentLevelIndex = nextLevelIndex;
         LoadGameplayScene(nextScene);
+        return true;
+    }
+
+    /// <summary>
+    /// Контракт: вызывать после проверки win-условий, когда игрок вошёл в trigger завершения уровня.
+    /// Гарантирует запись завершённой сцены, следующей сцены и состояния игрока в выбранный слот.
+    /// Для win на выходе успешное сохранение обязательно: GameLoopFlowController не покажет победу при false.
+    /// Не сохраняет активных врагов, projectile, индекс текущей волны или состояние encounter.
+    /// Почему так: конец уровня является понятной безопасной точкой, а не хрупким снимком середины боя.
+    /// Потенциальное применение: кнопка Continue сможет открыть следующий незавершённый уровень.
+    /// </summary>
+    public bool TrySaveLevelCheckpointProgress(int slotIndex, Vector3 levelExitPosition)
+    {
+        if (!TryBuildCheckpointData(
+                $"LevelComplete_{SceneManager.GetActiveScene().name}",
+                levelExitPosition,
+                true,
+                out CheckpointSaveData data))
+            return false;
+
+        return TrySaveCheckpointData(slotIndex, data);
+    }
+
+    /// <summary>
+    /// Контракт: вызывать из отдельной safe-point зоны, где сохранение разрешено дизайном уровня.
+    /// Гарантирует тот же формат данных, что и сохранение на выходе, но помечает источник как отдельный checkpoint.
+    /// Не проверяет encounter самостоятельно: это делает CheckpointTrigger перед вызовом.
+    /// Почему так: GameManager отвечает за данные, а trigger отвечает за правила своей зоны.
+    /// Потенциальное применение: checkpoint в хабе, перед сложной комнатой или после длинного перехода.
+    /// </summary>
+    public bool TrySaveCheckpointProgress(int slotIndex, Vector3 checkpointPosition)
+    {
+        if (!TryBuildCheckpointData(
+                $"Checkpoint_{SceneManager.GetActiveScene().name}",
+                checkpointPosition,
+                false,
+                out CheckpointSaveData data))
+            return false;
+
+        return TrySaveCheckpointData(slotIndex, data);
+    }
+
+    /// <summary>
+    /// Контракт: записывает уже собранные checkpoint-данные в выбранный слот.
+    /// Почему так: публичные методы отвечают за сценарий сохранения, а этот метод держит единый вызов save-системы.
+    /// Потенциальное применение: одинаковое логирование для выхода уровня и отдельной checkpoint-зоны.
+    /// </summary>
+    private bool TrySaveCheckpointData(int slotIndex, CheckpointSaveData data)
+    {
+        bool saved = CheckpointSaveSystem.Save(slotIndex, data);
+        if (saved)
+        {
+            Debug.Log(
+                $"GameManager: checkpoint '{data.checkpointId}' сохранён в слот {slotIndex} после сцены '{data.completedSceneName}'. " +
+                "Активная волна encounter намеренно не сохраняется.",
+                this);
+        }
+
+        return saved;
+    }
+
+    /// <summary>
+    /// Контракт: собирает CheckpointSaveData из текущей gameplay-сцены и компонентов игрока.
+    /// Входные условия: на сцене есть PlayerStats, PlayerProgression и WeaponManager.
+    /// Шаги: синхронизировать индекс уровня, вычислить следующую сцену, снять HP/Mana/XP/оружие.
+    /// Типичные поломки: дубликаты Player, пустой LevelSequenceData, отсутствующий WeaponManager.
+    /// Что проверить: prefab игрока, LevelSequenceData.asset, Console warnings от TryResolvePlayerSystems.
+    /// </summary>
+    private bool TryBuildCheckpointData(
+        string checkpointId,
+        Vector3 checkpointPosition,
+        bool savedFromLevelExit,
+        out CheckpointSaveData data)
+    {
+        data = null;
+
+        if (!TryResolvePlayerSystems(out PlayerStats playerStats, out PlayerProgression playerProgression, out WeaponManager weaponManager))
+        {
+            Debug.LogWarning(
+                "GameManager: checkpoint не сохранён, потому что не найдены PlayerStats, PlayerProgression или WeaponManager.",
+                this);
+            return false;
+        }
+
+        UpdateCurrentLevelIndexFromActiveScene();
+        string completedSceneName = SceneManager.GetActiveScene().name;
+        int completedLevelIndex = currentLevelIndex;
+        int nextLevelIndex = completedLevelIndex >= 0 ? completedLevelIndex + 1 : -1;
+        TryGetLevelSceneName(nextLevelIndex, out string nextSceneName);
+
+        data = new CheckpointSaveData
+        {
+            checkpointId = string.IsNullOrWhiteSpace(checkpointId) ? $"Checkpoint_{completedSceneName}" : checkpointId,
+            completedSceneName = completedSceneName,
+            nextSceneName = nextSceneName,
+            completedLevelIndex = completedLevelIndex,
+            nextLevelIndex = string.IsNullOrWhiteSpace(nextSceneName) ? -1 : nextLevelIndex,
+            checkpointPosition = checkpointPosition,
+            savedFromLevelExit = savedFromLevelExit,
+            health = playerStats.CurrentHealth,
+            mana = playerStats.CurrentMana,
+            playerLevel = playerProgression.CurrentLevel,
+            experience = playerProgression.CurrentExperience,
+            weaponSlotIndex = weaponManager.CurrentWeaponSlotIndex
+        };
+
         return true;
     }
 

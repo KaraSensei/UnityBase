@@ -4,33 +4,51 @@ using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 /// <summary>
-/// Связывает lose/win UI с состояниями игры и переходом на следующий уровень.
+/// GameLoopFlowController
+/// Что делает: связывает lose/win UI с состояниями игры, checkpoint-сохранением конца уровня и переходом дальше.
+/// Зачем нужен в игре: уровень должен завершаться предсказуемо: смерть показывает lose, выход после encounter показывает win.
+/// Связи: PlayerStats, EventBus, GameManager, ExitWinTrigger и кнопки lose/win экранов.
+/// Как используется: scene object подписывается на смерть игрока и принимает запрос победы от trigger выхода.
+/// Расширения: Continue-flow, разные условия победы, отдельный экран выбора следующего уровня.
+/// Совет: если win не срабатывает, проверить active state выхода, requiredEncounterIdForWin и ссылки UI в Inspector.
+/// Совет: если checkpoint не пишется, проверить checkpointSlotIndex и логи CheckpointSaveSystem.
 /// </summary>
 public class GameLoopFlowController : MonoBehaviour
 {
-    [Header("Lose UI (scene canvas or prefab)")]
+    [Header("UI поражения")]
+    [Tooltip("Панель поражения в сцене или prefab-инстанс.")]
     [SerializeField] private GameObject losePanel;
+    [Tooltip("Кнопка перезапуска текущей gameplay-сцены.")]
     [SerializeField] private Button loseRestartButton;
+    [Tooltip("Кнопка выхода в главное меню.")]
     [SerializeField] private Button loseMenuButton;
 
-    [Header("Win UI (scene canvas or prefab)")]
+    [Header("UI победы")]
+    [Tooltip("Панель победы в сцене или prefab-инстанс.")]
     [SerializeField] private GameObject winPanel;
+    [Tooltip("Кнопка выхода в главное меню.")]
     [SerializeField] private Button winMenuButton;
 
     [FormerlySerializedAs("winNextWaveButton")]
+    [Tooltip("Кнопка перехода на следующий уровень.")]
     [SerializeField] private Button winNextLevelButton;
 
-    [Header("Shared UI")]
+    [Header("Общий UI")]
+    [Tooltip("Панель паузы, которую нужно скрыть при win/lose.")]
     [SerializeField] private GameObject pausePanel;
 
-    [Header("Win Condition")]
-    [Tooltip("Exit object that becomes active after encounter completion.")]
+    [Header("Условие победы")]
+    [Tooltip("Объект выхода, который становится активным после завершения encounter.")]
     [SerializeField] private GameObject exitActivationObjectOverride;
 
     [Tooltip("ID обязательного encounter для победы через выход. Если пусто, фильтр по ID отключён.")]
     [SerializeField] private string requiredEncounterIdForWin = string.Empty;
 
-    [Header("Debug")]
+    [Header("Checkpoint-сохранение")]
+    [Tooltip("Слот checkpoint-сохранения для выхода уровня: 0, 1 или 2.")]
+    [SerializeField] private int checkpointSlotIndex = 0;
+
+    [Header("Отладка")]
     [SerializeField] private bool showDebugLogs = true;
 
     private PlayerStats playerStats;
@@ -44,9 +62,16 @@ public class GameLoopFlowController : MonoBehaviour
     {
         ResolvePlayerStats();
         ValidateReferences();
+        ValidateCheckpointSlotIndex();
         HideAllScreens();
     }
 
+    /// <summary>
+    /// Входные условия: объект flow активен, EventBus/GameManager уже созданы Bootstrap-сценой.
+    /// Шаги: подписаться на смерть игрока, событие завершения encounter и кнопки UI.
+    /// Типичные поломки: PlayerStats не найден, EventBus отсутствует, кнопки не назначены в Inspector.
+    /// Что проверить: Console warnings и ссылки lose/win кнопок на объекте GameLoopFlowController.
+    /// </summary>
     private void OnEnable()
     {
         SubscribeToPlayerDeath();
@@ -54,6 +79,12 @@ public class GameLoopFlowController : MonoBehaviour
         BindButtons();
     }
 
+    /// <summary>
+    /// Входные условия: объект выключается или сцена выгружается.
+    /// Шаги: снять подписки со смерти игрока, EventBus и кнопок UI.
+    /// Типичные поломки: двойные клики/двойные события после перезагрузки сцены означают пропущенную отписку.
+    /// Что проверить: Console на повторные логи win/lose и количество GameLoopFlowController в сцене.
+    /// </summary>
     private void OnDisable()
     {
         UnsubscribeFromPlayerDeath();
@@ -62,20 +93,40 @@ public class GameLoopFlowController : MonoBehaviour
     }
 
     /// <summary>
-    /// Запрашивает победу от exit-триггера с проверкой условий win.
+    /// Контракт: вызывать только из trigger завершения уровня после входа игрока.
+    /// Метод проверяет win-условия, сохраняет checkpoint уровня через GameManager и только потом показывает win.
+    /// Win не показывается, если save не прошёл: для урока 13 файл JSON является частью smoke-проверки.
+    /// Не сохраняет активную волну: если encounter ещё не завершён, метод вернёт false.
+    /// Почему так: конец уровня является безопасной точкой, а не случайным моментом внутри боя.
+    /// Потенциальное применение: Continue сможет открыть следующий уровень по данным save.
     /// </summary>
-    public void RequestWinFromExit()
+    public bool RequestWinFromExit(Vector3 levelExitPosition)
     {
         if (!CanTriggerWin())
-            return;
+            return false;
 
         if (exitActivationObjectOverride != null && !exitActivationObjectOverride.activeInHierarchy)
-            return;
+            return false;
 
         if (!CanWinByEncounterRule())
-            return;
+            return false;
+
+        if (GameManager.Instance != null)
+        {
+            bool checkpointSaved = GameManager.Instance.TrySaveLevelCheckpointProgress(checkpointSlotIndex, levelExitPosition);
+            if (!checkpointSaved)
+            {
+                Debug.LogWarning(
+                    $"{name}: win остановлен, потому что checkpoint не сохранён в слот {checkpointSlotIndex}. " +
+                    "Проверьте PlayerStats/PlayerProgression/WeaponManager на игроке, ошибки Save Game Free, " +
+                    "а также лог Checkpoint JSON written с путём к Application.persistentDataPath.",
+                    this);
+                return false;
+            }
+        }
 
         TriggerWin();
+        return true;
     }
 
     private void ResolvePlayerStats()
@@ -109,6 +160,19 @@ public class GameLoopFlowController : MonoBehaviour
 
         if (exitActivationObjectOverride == null && showDebugLogs)
             Debug.LogWarning($"{name}: exitActivationObjectOverride is not assigned. Win can still be requested by trigger.", this);
+    }
+
+    private void ValidateCheckpointSlotIndex()
+    {
+        if (checkpointSlotIndex >= 0 && checkpointSlotIndex < CheckpointSaveSystem.SlotCount)
+            return;
+
+        Debug.LogError(
+            $"{name}: checkpointSlotIndex={checkpointSlotIndex} вне диапазона 0..{CheckpointSaveSystem.SlotCount - 1}. " +
+            "Исправьте значение в Inspector. Для предсказуемого teacher repo в runtime будет использован слот 0.",
+            this);
+
+        checkpointSlotIndex = 0;
     }
 
     private void BindButtons()

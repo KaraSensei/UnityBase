@@ -3,9 +3,12 @@ using UnityEngine;
 /*
  * ExitWinTrigger
  * Назначение: trigger-точка, через которую игрок завершает уровень (win path).
- * Что делает: при входе игрока запрашивает победу у GameLoopFlowController.
+ * Что делает: при входе игрока запрашивает победу у GameLoopFlowController и передаёт позицию выхода
+ * для checkpoint-сохранения завершённого уровня.
  * Связи: GameLoopFlowController (RequestWinFromExit), коллайдер игрока и tag-фильтр.
- * Паттерны: trigger-driven gameplay.
+ * Как используется: объект выхода активируется после encounter и ждёт входа игрока в trigger.
+ * Расширения: эффект портала, разные типы выходов, подсказка UI перед переходом.
+ * Совет: если сохранение не происходит, проверить active state выхода и что winAccepted возвращает true.
  */
 public class ExitWinTrigger : MonoBehaviour
 {
@@ -28,8 +31,11 @@ public class ExitWinTrigger : MonoBehaviour
     }
 
     /// <summary>
-    /// При входе игрока в trigger запрашивает win у GameLoopFlowController.
-    /// Сам trigger не решает, можно ли выигрывать, он только делегирует запрос.
+    /// Контракт: вызывается Unity при входе collider в trigger завершения уровня.
+    /// Входные условия: объект выхода активен, collider принадлежит игроку, flowController назначен.
+    /// Шаги: отфильтровать игрока, передать позицию выхода, дождаться ответа winAccepted.
+    /// Типичные поломки: неверный tag, Collider не Is Trigger, flowController не назначен, выход ещё выключен.
+    /// Что проверить: Inspector выхода, tag Player, active state ExitUnlockedMarker, Console-лог winAccepted.
     /// </summary>
     private void OnTriggerEnter(Collider other)
     {
@@ -47,9 +53,9 @@ public class ExitWinTrigger : MonoBehaviour
             return;
         }
 
-        flowController.RequestWinFromExit();
+        bool winAccepted = flowController.RequestWinFromExit(transform.position);
 
-        if (showDebugLogs)
+        if (showDebugLogs && winAccepted)
             Debug.Log($"{name}: player entered exit trigger, win requested.", this);
     }
 

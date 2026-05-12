@@ -1008,6 +1008,7 @@ MonoBehaviour:
   pausePanel: {fileID: 485550451}
   exitActivationObjectOverride: {fileID: 200400300}
   requiredEncounterIdForWin: 
+  checkpointSlotIndex: 0
   showDebugLogs: 1
 --- !u!114 &1268623243 stripped
 MonoBehaviour:
@@ -1761,27 +1762,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5017327489913230112, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5228683984656452039, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
+      propertyPath: m_AnchorMax.x
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5228683984656452039, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
-      propertyPath: m_AnchorMax.x
-      value: 0.85
-      objectReference: {fileID: 0}
-    - target: {fileID: 5228683984656452039, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5228683984656452039, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMin.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5228683985144843443, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5228683985144843443, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5664294580028971201, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: musicSlider
@@ -1813,23 +1814,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7283048583714045780, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7283048583714045780, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7283048584335997472, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7283048584335997472, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7283048584335997472, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMin.x
-      value: 0.85
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9016401118193824613, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_Pivot.x
