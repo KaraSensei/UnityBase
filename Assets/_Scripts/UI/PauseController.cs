@@ -26,9 +26,21 @@ public class PauseController : MonoBehaviour
     [Tooltip("Кнопка возврата в главное меню.")]
     [SerializeField] private Button buttonMainMenu;
 
+    /// <summary>
+    /// Входные условия: gameplay-сцена только создала UI-объекты.
+    /// Шаги: сразу скрыть pausePanel, чтобы active state из prefab или scene не переносил паузу между уровнями.
+    /// Типичные поломки: панель была сохранена активной в prefab или scene, поэтому появлялась при загрузке уровня.
+    /// Что проверить: active state pausePanel в Inspector и Console на ошибки ссылок.
+    /// </summary>
+    private void Awake()
+    {
+        HidePausePanel();
+    }
+
     private void Start()
     {
         ValidateReferences();
+        HidePausePanel();
     }
 
     private void OnEnable()

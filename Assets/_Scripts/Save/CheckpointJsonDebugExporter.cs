@@ -55,4 +55,32 @@ public static class CheckpointJsonDebugExporter
             return false;
         }
     }
+
+    /// <summary>
+    /// Контракт: удаляет debug-JSON выбранного слота, если файл существует.
+    /// Метод используется вместе с очисткой основного Save Game Free слота и не создаёт новый файл.
+    /// Почему так: читаемая JSON-копия должна показывать актуальное состояние слота, а не старый прогресс после New Game.
+    /// Потенциальное применение: отдельная кнопка очистки слота в меню профилей.
+    /// </summary>
+    public static bool Delete(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= CheckpointSaveSystem.SlotCount)
+            return false;
+
+        try
+        {
+            string fileName = string.Format(FileNameFormat, slotIndex);
+            string path = Path.Combine(Application.persistentDataPath, fileName);
+
+            if (File.Exists(path))
+                File.Delete(path);
+
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError($"CheckpointJsonDebugExporter: ошибка удаления JSON для слота {slotIndex}: {exception.Message}");
+            return false;
+        }
+    }
 }

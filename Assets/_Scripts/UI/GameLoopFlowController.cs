@@ -5,13 +5,13 @@ using UnityEngine.UI;
 
 /// <summary>
 /// GameLoopFlowController
-/// Что делает: связывает lose/win UI с состояниями игры, checkpoint-сохранением конца уровня и переходом дальше.
+/// Что делает: связывает lose/win UI с состояниями игры, checkpoint-сохранением конца уровня, restart через checkpoint и переходом дальше.
 /// Зачем нужен в игре: уровень должен завершаться предсказуемо: смерть показывает lose, выход после encounter показывает win.
-/// Связи: PlayerStats, EventBus, GameManager, ExitWinTrigger и кнопки lose/win экранов.
-/// Как используется: scene object подписывается на смерть игрока и принимает запрос победы от trigger выхода.
-/// Расширения: Continue-flow, разные условия победы, отдельный экран выбора следующего уровня.
+/// Связи: PlayerStats, EventBus, GameManager.RestartFromCheckpointOrScene, ExitWinTrigger и кнопки lose/win экранов.
+/// Как используется: scene object подписывается на смерть игрока, принимает запрос победы от trigger выхода и перенаправляет Restart в GameManager.
+/// Расширения: разные условия победы, отдельный экран выбора следующего уровня, расширенный win summary.
 /// Совет: если win не срабатывает, проверить active state выхода, requiredEncounterIdForWin и ссылки UI в Inspector.
-/// Совет: если checkpoint не пишется, проверить checkpointSlotIndex и логи CheckpointSaveSystem.
+/// Совет: если checkpoint не пишется, проверить активный слот GameManager, fallback checkpointSlotIndex и логи CheckpointSaveSystem.
 /// </summary>
 public class GameLoopFlowController : MonoBehaviour
 {
@@ -118,7 +118,7 @@ public class GameLoopFlowController : MonoBehaviour
             {
                 Debug.LogWarning(
                     $"{name}: win остановлен, потому что checkpoint не сохранён в слот {checkpointSlotIndex}. " +
-                    "Проверьте PlayerStats/PlayerProgression/WeaponManager на игроке, ошибки Save Game Free, " +
+                    "Проверить PlayerStats/PlayerProgression/WeaponManager на игроке, ошибки Save Game Free, " +
                     "а также лог Checkpoint JSON written с путём к Application.persistentDataPath.",
                     this);
                 return false;
@@ -348,7 +348,7 @@ public class GameLoopFlowController : MonoBehaviour
     private void HandleLoseRestartClicked()
     {
         if (GameManager.Instance != null)
-            GameManager.Instance.RestartGameScene();
+            GameManager.Instance.RestartFromCheckpointOrScene();
     }
 
     private void HandleMenuClicked()

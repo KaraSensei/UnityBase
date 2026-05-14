@@ -99,6 +99,23 @@ public static class CheckpointSaveSystem
     }
 
     /// <summary>
+    /// Контракт: проверяет, есть ли хотя бы один сохранённый checkpoint среди трёх слотов.
+    /// Метод только читает наличие слотов и не загружает игровые сцены.
+    /// Почему так: главное меню может быстро решить, активна ли кнопка Continue, без знания деталей save-данных.
+    /// Потенциальное применение: индикатор наличия прогресса в стартовом экране.
+    /// </summary>
+    public static bool HasAnySave()
+    {
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (Exists(i))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Контракт: читает сохранённые данные, но не переносит игрока и не грузит сцену.
     /// Почему так: чтение данных безопасно оставить заранее, а сам load-flow относится к следующему уроку.
     /// Потенциальное применение: экран Continue может показать имя сцены и checkpointId.
@@ -126,6 +143,36 @@ public static class CheckpointSaveSystem
         {
             Debug.LogError($"CheckpointSaveSystem: ошибка чтения слота {slotIndex}: {exception.Message}");
             data = null;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Контракт: удаляет данные выбранного слота перед началом новой игры.
+    /// Вызывать из меню после выбора слота New Game. Метод не спрашивает подтверждение и не влияет на другие слоты.
+    /// Почему так: подтверждение перезаписи относится к UI-сценарию, а save-система отвечает только за техническую операцию.
+    /// Потенциальное применение: кнопка Delete Slot или Reset Progress в отдельном меню профилей.
+    /// </summary>
+    public static bool Delete(int slotIndex)
+    {
+        if (!IsValidSlotIndex(slotIndex))
+            return false;
+
+        string slotKey = GetSlotKey(slotIndex);
+
+        try
+        {
+            if (!SaveGame.Exists(slotKey))
+                return true;
+
+            SaveGame.Delete(slotKey);
+            CheckpointJsonDebugExporter.Delete(slotIndex);
+            Debug.Log($"CheckpointSaveSystem: слот {slotIndex} очищен.");
+            return true;
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError($"CheckpointSaveSystem: ошибка очистки слота {slotIndex}: {exception.Message}");
             return false;
         }
     }
