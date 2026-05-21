@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,13 +7,15 @@ using UnityEngine.UI;
  * Назначение: управляет показом/скрытием паузы и действиями Resume/Main Menu.
  * Роль в игре: обслуживает только pause-flow, без логики панели настроек.
  * Связи: EventBus (события паузы), InputManager (клавиши), GameManager (смена состояния), UI-кнопки.
- * Как используется: вешается в игровой сцене, ссылки на pausePanel и кнопки назначаются в Inspector.
+ * Как используется: висит в игровой сцене, ссылки на pausePanel и кнопки назначаются в Inspector.
+ * Порядок Bootstrap: EventBus и InputManager могут появиться после OnEnable этого компонента, поэтому подписка выполняется отложенно.
+ * Риск интеграции: после импорта внешнего пакета порядок загрузки может измениться, и пауза будет "молчать", если подписка была сделана слишком рано.
  * Идеи расширения:
  * - Добавить установку фокуса на Resume при открытии паузы.
  * - Добавить анимацию появления/скрытия панели.
  * Практические советы:
- * - Если пауза не открывается с клавиши, проверьте InputManager.Instance и его подписки.
- * - Если кнопки молчат, сначала проверьте назначение buttonResume/buttonMainMenu в Inspector.
+ * - Если пауза не открывается с клавиши, проверить InputManager.Instance, EventBus.Instance и action Player/Pause в Console/Inspector.
+ * - Если кнопки молчат, проверить назначение buttonResume/buttonMainMenu в Inspector.
  */
 public class PauseController : MonoBehaviour
 {
@@ -25,6 +28,10 @@ public class PauseController : MonoBehaviour
 
     [Tooltip("Кнопка возврата в главное меню.")]
     [SerializeField] private Button buttonMainMenu;
+
+    private Coroutine bindingRoutine;
+    private bool eventBusBound;
+    private bool inputManagerBound;
 
     /// <summary>
     /// Входные условия: gameplay-сцена только создала UI-объекты.
@@ -45,17 +52,7 @@ public class PauseController : MonoBehaviour
 
     private void OnEnable()
     {
-        if (EventBus.Instance != null)
-        {
-            EventBus.Instance.OnGamePaused += ShowPausePanel;
-            EventBus.Instance.OnGameResumed += HidePausePanel;
-        }
-
-        if (InputManager.Instance != null)
-        {
-            InputManager.Instance.OnPausePressed += HandlePausePressed;
-            InputManager.Instance.OnCancelPressed += HandleCancelPressed;
-        }
+        bindingRoutine = StartCoroutine(BindDependenciesWhenReady());
 
         if (buttonResume != null)
             buttonResume.onClick.AddListener(OnResumeClicked);
@@ -66,17 +63,13 @@ public class PauseController : MonoBehaviour
 
     private void OnDisable()
     {
-        if (EventBus.Instance != null)
+        if (bindingRoutine != null)
         {
-            EventBus.Instance.OnGamePaused -= ShowPausePanel;
-            EventBus.Instance.OnGameResumed -= HidePausePanel;
+            StopCoroutine(bindingRoutine);
+            bindingRoutine = null;
         }
 
-        if (InputManager.Instance != null)
-        {
-            InputManager.Instance.OnPausePressed -= HandlePausePressed;
-            InputManager.Instance.OnCancelPressed -= HandleCancelPressed;
-        }
+        UnbindDependencies();
 
         if (buttonResume != null)
             buttonResume.onClick.RemoveListener(OnResumeClicked);
@@ -95,6 +88,56 @@ public class PauseController : MonoBehaviour
 
         if (buttonMainMenu == null)
             Debug.LogWarning($"{name}: buttonMainMenu не назначен.", this);
+    }
+
+    /// <summary>
+    /// Контракт: ждёт появления EventBus и InputManager, затем один раз подписывает pause UI на runtime-события.
+    /// Входные условия: компонент активен, Bootstrap может уже создать singleton'ы или создать их через несколько кадров.
+    /// Гарантии: подписки не дублируются, а OnDisable корректно снимает их и сбрасывает флаги.
+    /// Типичные поломки: EventBus/InputManager не созданы Bootstrap-сценой, action Player/Pause не найден или не назначен Input Actions Asset.
+    /// Что проверить: Console на ошибки InputManager, Inspector у BootstrapManager/InputManager и ссылки pausePanel/buttonResume/buttonMainMenu.
+    /// </summary>
+    private IEnumerator BindDependenciesWhenReady()
+    {
+        while (isActiveAndEnabled && (!eventBusBound || !inputManagerBound))
+        {
+            if (!eventBusBound && EventBus.Instance != null)
+            {
+                EventBus.Instance.OnGamePaused += ShowPausePanel;
+                EventBus.Instance.OnGameResumed += HidePausePanel;
+                eventBusBound = true;
+            }
+
+            if (!inputManagerBound && InputManager.Instance != null)
+            {
+                InputManager.Instance.OnPausePressed += HandlePausePressed;
+                InputManager.Instance.OnCancelPressed += HandleCancelPressed;
+                inputManagerBound = true;
+            }
+
+            if (!eventBusBound || !inputManagerBound)
+                yield return null;
+        }
+
+        bindingRoutine = null;
+    }
+
+    private void UnbindDependencies()
+    {
+        if (eventBusBound && EventBus.Instance != null)
+        {
+            EventBus.Instance.OnGamePaused -= ShowPausePanel;
+            EventBus.Instance.OnGameResumed -= HidePausePanel;
+        }
+
+        if (inputManagerBound && InputManager.Instance != null)
+        {
+            InputManager.Instance.OnPausePressed -= HandlePausePressed;
+            InputManager.Instance.OnCancelPressed -= HandleCancelPressed;
+        }
+
+        eventBusBound = false;
+        inputManagerBound = false;
     }
 
     private void ShowPausePanel()

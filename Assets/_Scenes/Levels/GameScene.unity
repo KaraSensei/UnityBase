@@ -332,7 +332,7 @@ GameObject:
   - component: {fileID: 200400103}
   - component: {fileID: 200400102}
   m_Layer: 0
-  m_Name: EncounterTrigger_Lesson7.4
+  m_Name: EncounterTrigger
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1524,15 +1524,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7475512616211273188, guid: 41d4e987cefccd24bac5138a113c4245, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 27.48
+      value: 10.48
       objectReference: {fileID: 0}
     - target: {fileID: 7475512616211273188, guid: 41d4e987cefccd24bac5138a113c4245, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.18
+      value: 0.72
       objectReference: {fileID: 0}
     - target: {fileID: 7475512616211273188, guid: 41d4e987cefccd24bac5138a113c4245, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 38.96
+      value: 44.98
       objectReference: {fileID: 0}
     - target: {fileID: 7475512616211273188, guid: 41d4e987cefccd24bac5138a113c4245, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1758,7 +1758,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3341599908975020095, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5017327489913230112, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_Name
@@ -1822,7 +1822,7 @@ PrefabInstance:
       objectReference: {fileID: 5039514878538700882}
     - target: {fileID: 6339709835797667602, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7283048583714045780, guid: 25ac4f9b09e6eda4ebd6bb12203d7123, type: 3}
       propertyPath: m_AnchorMax.x
