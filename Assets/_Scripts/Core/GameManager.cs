@@ -352,6 +352,24 @@ public class GameManager : MonoBehaviour
         return TrySaveCheckpointData(slotIndex, data);
     }
 
+    public bool TrySaveCheckpointProgress(Vector3 checkpointPosition)
+    {
+        if (!IsValidSaveSlot(activeSaveSlotIndex))
+        {
+            Debug.LogError("GameManager: save slot is not selected. Checkpoint was not saved.", this);
+            return false;
+        }
+
+        if (!TryBuildCheckpointData(
+                $"Checkpoint_{SceneManager.GetActiveScene().name}",
+                checkpointPosition,
+                false,
+                out CheckpointSaveData data))
+            return false;
+
+        return TrySaveCheckpointData(activeSaveSlotIndex, data);
+    }
+
     /// <summary>
     /// Контракт: записывает уже собранные checkpoint-данные в выбранный слот.
     /// Почему так: публичные методы отвечают за сценарий сохранения, а этот метод держит единый вызов save-системы.
