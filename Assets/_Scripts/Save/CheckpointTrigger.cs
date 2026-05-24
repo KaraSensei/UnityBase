@@ -13,10 +13,6 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public class CheckpointTrigger : MonoBehaviour
 {
-    [Header("Слот сохранения")]
-    [Tooltip("Индекс слота сохранения: 0, 1 или 2.")]
-    [SerializeField] private int slotIndex;
-
     [Header("Фильтр игрока")]
     [Tooltip("Tag, который считается игроком для активации checkpoint.")]
     [SerializeField] private string requiredTag = "Player";
@@ -46,9 +42,6 @@ public class CheckpointTrigger : MonoBehaviour
     /// </summary>
     private void OnTriggerEnter(Collider other)
     {
-        if (!IsValidSlotIndex())
-            return;
-
         if (!IsPlayerCollider(other))
             return;
 
@@ -61,26 +54,9 @@ public class CheckpointTrigger : MonoBehaviour
             return;
         }
 
-        bool saved = GameManager.Instance.TrySaveCheckpointProgress(slotIndex, transform.position);
+        bool saved = GameManager.Instance.TrySaveCheckpointProgress(transform.position);
         if (showDebugLogs && saved)
-            Debug.Log($"{name}: отдельный checkpoint сохранён в слот {slotIndex}.", this);
-    }
-
-    /// <summary>
-    /// Контракт: локально проверяет слот до обращения к GameManager.
-    /// Почему так: trigger должен сам объяснять ошибку настройки в Inspector, а не молча полагаться на save-систему.
-    /// Потенциальное применение: такая же локальная проверка нужна любым компонентам, где слот выбирается руками.
-    /// </summary>
-    private bool IsValidSlotIndex()
-    {
-        if (slotIndex >= 0 && slotIndex < CheckpointSaveSystem.SlotCount)
-            return true;
-
-        Debug.LogError(
-            $"{name}: неверный slotIndex {slotIndex}. " +
-            $"Укажите значение 0..{CheckpointSaveSystem.SlotCount - 1} в Inspector.",
-            this);
-        return false;
+            Debug.Log("Checkpoint saved.", this);
     }
 
     /// <summary>
